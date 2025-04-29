@@ -25,9 +25,7 @@ export interface QuestionnaireDisplayProps {
     questionnaireResponse: QuestionnaireResponse
     // The ValueSetLoader to use to load the value sets
     valueSetLoader: ValueSetLoader;
-    // Hide the buttons (default to false)
-    hideButtons?: boolean;
-    // Disable all the form fields (default to false)
+    // Disable all the form fields and hide the buttons (default to false)
     readOnly?: boolean;
     // Function to call when an error occurs
     onError: () => void;
@@ -692,7 +690,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 <Form.Group>
                     {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => setForm(massageFormForDisabledFields(fields, form)), configs.valueSetLoader))}
                 </Form.Group>
-                {!configs.hideButtons &&
+                {!configs.readOnly &&
                     <Form.Group className="d-flex flex-wrap align-items-start gap-4">
                         <Button
                             className="button"

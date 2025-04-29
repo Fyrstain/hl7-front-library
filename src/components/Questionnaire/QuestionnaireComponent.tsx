@@ -23,9 +23,7 @@ export interface QuestionnaireProps {
     terminologyUrl: string;
     // The url of the questionnaire
     questionnaireUrl: string;
-    // Hide the submit and reset buttons in the Questionnaire component
-    hideButtons?: boolean;
-    // Disable all the form fields (default to false)
+    // Disable all the form field and hide the buttons (default to false)
     readOnly?: boolean;
     // Function to call when you submit the form
     onSubmit: (questionnaireResponse: QuestionnaireResponse, bundle: Bundle) => void;
@@ -135,7 +133,6 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             questionnaire={questionnaire ?? {} as Questionnaire}
             questionnaireResponse={questionnaireResponse ?? {} as QuestionnaireResponse}
             valueSetLoader={valueSetLoader}
-            hideButtons={configs.hideButtons ?? false}
             readOnly={configs.readOnly ?? false}
             onSubmit={(questionnaireResponse) => { extractAndSubmit(questionnaireResponse) }}
             onError={configs.onError}
