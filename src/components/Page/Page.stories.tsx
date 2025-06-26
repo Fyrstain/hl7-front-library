@@ -84,7 +84,7 @@ const Template: StoryObj = {
             }
             }
             titleKey="Example page"
-            titleAction={<FontAwesomeIcon icon={faGear} size="xl"/>}
+            pageAction={<FontAwesomeIcon icon={faGear} size="xl"/>}
             loading={false}
             children={<>This is an example page to display.</>}
             footerConfigs={{

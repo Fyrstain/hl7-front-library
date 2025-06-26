@@ -19,7 +19,7 @@ export interface PageConfiguration {
     doLogin?: () => void;
     navigationBarConfigs: NavigationBarConfig;
     titleKey?: string;
-    titleAction?: ReactElement;
+    pageAction?: ReactElement;
     loading?: boolean;
     children?: ReactElement<any, string | JSXElementConstructor<any>> | undefined;
     footerConfigs?: FooterProps;
@@ -46,8 +46,8 @@ const Page: FunctionComponent<PageConfiguration> = (configs) => {
                     level={1}
                     content={configs.language ? configs.language(configs.titleKey) : configs.titleKey}
                   />
-                  {configs.titleAction && (
-                    <div className="ms-4">{configs.titleAction}</div>
+                  {configs.pageAction && (
+                    <div className="ms-4">{configs.pageAction}</div>
                   )}
               </div>
             )}
