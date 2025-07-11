@@ -333,6 +333,11 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerTime?.toString());
             } else if (enableWhen.answerString !== undefined) {
                 return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerString?.toString());
+            } else if (enableWhen.answerCoding !== undefined) {
+                return (form) => {
+                    const expectedValue = enableWhen.answerCoding?.system + '|' + enableWhen.answerCoding?.code;
+                    return form[enableWhen.question].some(a => a !== expectedValue);
+                };
             }
         } else if (enableWhen.operator === '=') {
             if (enableWhen.answerBoolean !== undefined) {
@@ -349,6 +354,11 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 return (form) => form[enableWhen.question].some(a => a === enableWhen.answerTime?.toString());
             } else if (enableWhen.answerString !== undefined) {
                 return (form) => form[enableWhen.question].some(a => a === enableWhen.answerString);
+            } else if (enableWhen.answerCoding !== undefined) {
+                return (form) => {
+                    const expectedValue = enableWhen.answerCoding?.system + '|' + enableWhen.answerCoding?.code;
+                    return form[enableWhen.question].some(a => a === expectedValue);
+                };
             }
         } else if (enableWhen.operator === '<') {
             if (enableWhen.answerDecimal !== undefined) {
