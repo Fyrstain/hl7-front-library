@@ -427,6 +427,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     */
     function onReset() {
         setForm(getFormFromFields(fields, {}));
+        setValidated(false);
     }
 
     /**
@@ -492,7 +493,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                     case 'choice':
                         if (getField(key, fields)?.answerValueSet) {
                             item.answer = mapToCodingAnswer(value);
-                        } else if (getField(key, fields) && (getField(key, fields)?.answerOption.length ?? 0) > 0) {
+                        } else if (getField(key, fields) && (getField(key, fields)?.answerOption?.length ?? 0) > 0) {
                             const firstOption = getField(key, fields)?.answerOption[0];
                             // It is implied that all options have the same type here
                             if (firstOption?.valueInteger) {

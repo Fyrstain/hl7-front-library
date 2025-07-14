@@ -47,7 +47,7 @@ const BooleanField: React.FC<FieldConfig> = (configs) => {
     ////////////////////////////////
 
     return (
-        <Form.Group key={configs.field.id} hidden={ configs.field.disabled(configs.form) && configs.field.hideOnDisabled }>
+        <Form.Group key={configs.field.id}>
             <Form.Label>
                 <b>{configs.field.prefix && configs.field.prefix} </b>
                 {configs.field.label} {configs.field.required && "* "}:

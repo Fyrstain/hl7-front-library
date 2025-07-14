@@ -117,7 +117,7 @@ const SelectField: React.FC<FieldConfig> = (configs) => {
     }
 
     return (
-        <div hidden={configs.field.disabled(configs.form) && configs.field.hideOnDisabled}>{!configs.field.repeat &&
+        <div>{!configs.field.repeat &&
             <Form.Group key={configs.field.id}>
                 <Form.Label>
                     <b>{configs.field.prefix && configs.field.prefix} </b>

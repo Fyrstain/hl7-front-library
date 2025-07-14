@@ -43,7 +43,7 @@ const GroupField: React.FC<FieldConfig> = (configs) => {
         <>
             {/* If the field is not repeating, render it as a single instance */}
             {!configs.field.repeat &&
-                <Card className='group-field' hidden={configs.field.disabled(configs.form) && configs.field.hideOnDisabled}>
+                <Card className='group-field'>
                     <Card.Header>
                         <Title level={2} prefix={configs.field.prefix} content={configs.field.label} />
                     </Card.Header>
@@ -54,7 +54,7 @@ const GroupField: React.FC<FieldConfig> = (configs) => {
             }
             {/* If the field is repeating, render each instance of the group */}
             {configs.field.repeat &&
-                <div className="repeating-group-container" hidden={configs.field.disabled(configs.form) && configs.field.hideOnDisabled}>
+                <div className="repeating-group-container">
                     {/* Render each group instance */}
                     {configs.form[configs.field.id].map((_, index) => (
                         <Card key={`${configs.field.id}-${index}`} className='group-field mb-3'>

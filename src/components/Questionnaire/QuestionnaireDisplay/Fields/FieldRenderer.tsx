@@ -33,7 +33,7 @@ export class FieldRenderer {
             updateForm: (form: { [key: string]: string[] }) => void,
             valueSetLoader: ValueSetLoader
         ): React.JSX.Element {
-        if (field.hidden) {
+        if (field.hidden || (field.disabled(form) && field.hideOnDisabled)) {
             return <></>
         }
         // TODO allowed for valueSet or Options : coding, decimal, integer, date, dateTime, time, string or quantity

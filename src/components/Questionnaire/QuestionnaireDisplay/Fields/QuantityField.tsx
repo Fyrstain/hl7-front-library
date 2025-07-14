@@ -84,7 +84,7 @@ const QuantityField: React.FC<FieldConfig> = (configs) => {
     ////////////////////////////////
 
     return (
-        <div className='field' hidden={configs.field.disabled(configs.form) && configs.field.hideOnDisabled}>{!configs.field.repeat &&
+        <div className='field'>{!configs.field.repeat &&
             <Form.Group key={configs.field.id}>
                 <Form.Label>
                     <b>{configs.field.prefix && configs.field.prefix} </b>

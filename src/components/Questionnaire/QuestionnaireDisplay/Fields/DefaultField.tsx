@@ -78,7 +78,7 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
     ////////////////////////////////
 
     return (
-        <div className='field' hidden={configs.disabled(configs.form) && configs.hideOnDisabled}>{!configs.repeat &&
+        <div className='field'>{!configs.repeat &&
             <Form.Group key={configs.id}>
                 <Form.Label>
                     <b>{configs.prefix && configs.prefix} </b>
