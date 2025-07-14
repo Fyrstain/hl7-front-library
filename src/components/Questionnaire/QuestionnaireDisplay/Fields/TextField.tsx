@@ -44,7 +44,7 @@ const TextField: React.FC<FieldConfig> = (configs) => {
                 as="textarea"
                 placeholder={configs.field.placeholder}
                 style={configs.field.advancedRendering}
-                disabled={configs.field.disabled(configs.form)}
+                disabled={configs.field.disabled(configs.form, configs.field.id)}
                 readOnly={configs.field.readOnly}
                 required={configs.field.required}
                 //TODO What if it is an array ??

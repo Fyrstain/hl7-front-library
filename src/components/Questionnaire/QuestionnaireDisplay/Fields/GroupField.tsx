@@ -73,7 +73,16 @@ const GroupField: React.FC<FieldConfig> = (configs) => {
                             </Card.Header>
                             <Card.Body className="cardBody">
                                 {/* Render the fields for this group instance */}
-                                {configs.field.subField.map(field => FieldRenderer.getFieldComponent(field, configs.form, configs.updateForm, configs.valueSetLoader))}
+                                {configs.field.subField.map(field => {
+                                    const reidentifiedField = {
+                                        ...field,
+                                        id: `${configs.field.id}@@${index}@@${field.id}`
+                                    };
+                                    // fallback to initialValue if not in form
+                                    const fieldValue = configs.form[reidentifiedField.id] ?? [field.initialValue];
+                                    return FieldRenderer.getFieldComponent(reidentifiedField, { ...configs.form, [reidentifiedField.id]: fieldValue}, 
+                                        configs.updateForm, configs.valueSetLoader)
+                                })}
                             </Card.Body>
                         </Card>
                     ))}

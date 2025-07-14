@@ -96,7 +96,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
      */
     function massageFormForDisabledFields(fields: Field[], form: { [key: string]: string[] }): { [key: string]: string[] } {
         fields.forEach(field => {
-            if (field.disabled(form)) {
+            if (field.disabled(form, field.id)) {
                 var newValue = [field.initialValue];
                 console.log("reseting field : " + field.id + " to " + field.initialValue);
                 form = { ...form, [field.id]: newValue };
@@ -123,7 +123,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             placeholder: item.text,
             advancedRendering: getAdvancedRenderingFromExtensions(item.extension),
             hidden: isHidden(item.extension),
-            disabled: (form) => configs.readOnly || !getFieldEnabled(item)(form),
+            disabled: (form, questionId) => configs.readOnly || !getFieldEnabled(item)(form, questionId),
             hideOnDisabled: configs.readOnly ? false : (!item.disabledDisplay || item.disabledDisplay === "hidden"),
             readOnly: item.readOnly ?? false,
             required: item.required ?? false,
@@ -287,15 +287,18 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
      * @param item the questionnaire item.
      * @returns the computed function.
      */
-    function getFieldEnabled(item: QuestionnaireItem): (form: { [key: string]: string[] }) => boolean {
+    function getFieldEnabled(item: QuestionnaireItem): (form: { [key: string]: string[] }, idInForm: string) => boolean {
         if (!item.enableWhen || item.enableWhen.length === 0) {
             return () => item.disabledDisplay !== 'protected';
         } else {
             var enableFunctions = item.enableWhen.map(enableWhen => getEnableWhenFunction(item.linkId, enableWhen));
             if (item.enableBehavior === 'all') {
-                return (form) => enableFunctions.every(f => f(form)) && item.disabledDisplay !== 'protected';
+                return (form, idInForm) => enableFunctions.every(f => {
+                    console.log("Evaluating field enabled for %s", idInForm)
+                    f(form, idInForm)
+            }) && item.disabledDisplay !== 'protected';
             } else {
-                return (form) => enableFunctions.some(f => f(form)) && item.disabledDisplay !== 'protected';
+                return (form, idInForm) => enableFunctions.some(f => f(form, idInForm)) && item.disabledDisplay !== 'protected';
             }
         }
     }
@@ -307,97 +310,97 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
      * @param enableWhen the enableWhen element form the FHIR Questionnaire.
      * @returns the computed function.
      */
-    function getEnableWhenFunction(questionId: string, enableWhen: QuestionnaireItemEnableWhen): (form: { [key: string]: string[] }) => boolean {
+    function getEnableWhenFunction(questionId: string, enableWhen: QuestionnaireItemEnableWhen): (form: { [key: string]: string[] }, idInForm: string) => boolean {
         if (enableWhen.operator === 'exists') {
             if (enableWhen.answerBoolean) {
-                return (form) => {
-                    return form[enableWhen.question] !== undefined && form[enableWhen.question].some(a => a !== '');
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)] !== undefined && form[getActualEnableId(idInForm, enableWhen.question)].some(a => a !== '');
                 }
             } else {
-                return (form) => {
-                    return form[enableWhen.question] !== undefined && form[enableWhen.question].every(a => a !== '');
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)] !== undefined && form[getActualEnableId(idInForm, enableWhen.question)].every(a => a !== '');
                 }
             }
         } else if (enableWhen.operator === '!=') {
             if (enableWhen.answerBoolean !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerBoolean?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerBoolean?.toString());
             } else if (enableWhen.answerDecimal !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerDecimal?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerDecimal?.toString());
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerInteger?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerInteger?.toString());
             } else if (enableWhen.answerDate !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerDate?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerDate?.toString());
             } else if (enableWhen.answerDateTime !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerDateTime?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerDateTime?.toString());
             } else if (enableWhen.answerTime !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerTime?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerTime?.toString());
             } else if (enableWhen.answerString !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a !== enableWhen.answerString?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== enableWhen.answerString?.toString());
             } else if (enableWhen.answerCoding !== undefined) {
-                return (form) => {
+                return (form, idInForm) => {
                     const expectedValue = enableWhen.answerCoding?.system + '|' + enableWhen.answerCoding?.code;
-                    return form[enableWhen.question].some(a => a !== expectedValue);
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a !== expectedValue);
                 };
             }
         } else if (enableWhen.operator === '=') {
             if (enableWhen.answerBoolean !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerBoolean?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerBoolean?.toString());
             } else if (enableWhen.answerDecimal !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerDecimal?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerDecimal?.toString());
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerInteger?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerInteger?.toString());
             } else if (enableWhen.answerDate !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerDate?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerDate?.toString());
             } else if (enableWhen.answerDateTime !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerDateTime?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerDateTime?.toString());
             } else if (enableWhen.answerTime !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerTime?.toString());
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerTime?.toString());
             } else if (enableWhen.answerString !== undefined) {
-                return (form) => form[enableWhen.question].some(a => a === enableWhen.answerString);
+                return (form, idInForm) => form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === enableWhen.answerString);
             } else if (enableWhen.answerCoding !== undefined) {
-                return (form) => {
+                return (form, idInForm) => {
                     const expectedValue = enableWhen.answerCoding?.system + '|' + enableWhen.answerCoding?.code;
-                    return form[enableWhen.question].some(a => a === expectedValue);
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => a === expectedValue);
                 };
             }
         } else if (enableWhen.operator === '<') {
             if (enableWhen.answerDecimal !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseFloat(a) < (enableWhen.answerDecimal ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseFloat(a) < (enableWhen.answerDecimal ?? 0));
                 };
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseInt(a) < (enableWhen.answerInteger ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseInt(a) < (enableWhen.answerInteger ?? 0));
                 };
             }
         } else if (enableWhen.operator === '>') {
             if (enableWhen.answerDecimal !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseFloat(a) > (enableWhen.answerDecimal ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseFloat(a) > (enableWhen.answerDecimal ?? 0));
                 };
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseInt(a) > (enableWhen.answerInteger ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseInt(a) > (enableWhen.answerInteger ?? 0));
                 };
             }
         } else if (enableWhen.operator === '<=') {
             if (enableWhen.answerDecimal !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseFloat(a) <= (enableWhen.answerDecimal ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseFloat(a) <= (enableWhen.answerDecimal ?? 0));
                 };
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseInt(a) <= (enableWhen.answerInteger ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseInt(a) <= (enableWhen.answerInteger ?? 0));
                 };
             }
         } else if (enableWhen.operator === '>=') {
             if (enableWhen.answerDecimal !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseFloat(a) >= (enableWhen.answerDecimal ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseFloat(a) >= (enableWhen.answerDecimal ?? 0));
                 };
             } else if (enableWhen.answerInteger !== undefined) {
-                return (form) => {
-                    return form[enableWhen.question].some(a => parseInt(a) >= (enableWhen.answerInteger ?? 0));
+                return (form, idInForm) => {
+                    return form[getActualEnableId(idInForm, enableWhen.question)]?.some(a => parseInt(a) >= (enableWhen.answerInteger ?? 0));
                 };
             }
         }
@@ -416,6 +419,17 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                                                 : 'Reference'
             , questionId);
         return () => true;
+    }
+
+    function getActualEnableId(questionId: string, enableWhenQuestion: string): string {
+        var actualEnableQuestionId: string;
+        if (questionId.includes('@@')) {
+            const [groupId, groupIndexStr, subFieldId] = questionId.split("@@");
+            actualEnableQuestionId = `${groupId}@@${groupIndexStr}@@${enableWhenQuestion}`;
+        } else {
+            actualEnableQuestionId = enableWhenQuestion;
+        }
+        return actualEnableQuestionId;
     }
 
     ////////////////////////////////
@@ -454,10 +468,44 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         for (const [key, value] of Object.entries(form)) {
             var item = undefined;
             if (questionnaireResponse.item) {
-                item = getItemByLinkId(key, questionnaireResponse.item);
+                if (!key.includes('@@')) {
+                    item = getItemByLinkId(key, questionnaireResponse.item);
+                } else {
+                    // 1. Split ID (see for recursion)
+                    const [groupId, groupIndexStr, subFieldId] = key.split("@@");
+                    const groupIndex = parseInt(groupIndexStr, 10);
+
+                    // 2. Find group item
+                    var [parent, groupItems] = getItemsByLinkId(groupId, questionnaireResponse.item);
+                    if (!groupItems || groupItems.length === 0) {
+                        console.warn(`Group ${groupId} not found in QuestionnaireResponse`);
+                    } else {
+                        while (groupItems.length <= groupIndex) {
+                            const base = groupItems[0];
+                            const cloned = JSON.parse(JSON.stringify(base));
+                            cloned.item?.forEach((i: { answer: any; }) => delete i.answer);
+                            groupItems.push(cloned);
+                            parent.push(cloned);
+                        }
+                        const repeatedInstance = groupItems[groupIndex];
+
+                        // 4. Find subitem
+                        item = repeatedInstance.item?.find(i => i.linkId === subFieldId);
+                        if (!item) {
+                            console.warn(`Subfield ${subFieldId} not found in group ${groupId} iteration ${groupIndex}`);
+                        }
+                    }
+                }
             }
             if (item) {
-                var type = getFieldType(key, fields);
+                var originalFieldKey = undefined;
+                if (key.includes('@@')) {
+                    const [groupId, groupIndexStr, subFieldId] = key.split("@@");
+                    originalFieldKey = subFieldId;
+                } else {
+                    originalFieldKey = key;
+                }
+                var type = getFieldType(originalFieldKey, fields);
                 switch (type) {
                     case 'date':
                         item.answer = mapToDateAnswer(value);
@@ -491,10 +539,10 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                         item.answer = mapToQuantityAnswer(value);
                         break;
                     case 'choice':
-                        if (getField(key, fields)?.answerValueSet) {
+                        if (getField(originalFieldKey, fields)?.answerValueSet) {
                             item.answer = mapToCodingAnswer(value);
-                        } else if (getField(key, fields) && (getField(key, fields)?.answerOption?.length ?? 0) > 0) {
-                            const firstOption = getField(key, fields)?.answerOption[0];
+                        } else if (getField(originalFieldKey, fields) && (getField(originalFieldKey, fields)?.answerOption?.length ?? 0) > 0) {
+                            const firstOption = getField(originalFieldKey, fields)?.answerOption[0];
                             // It is implied that all options have the same type here
                             if (firstOption?.valueInteger) {
                                 item.answer = mapToIntegerAnswer(value);
@@ -652,6 +700,24 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         return answer.length > 0 ? answer : undefined;
+    }
+
+    function getItemsByLinkId(linkId: string, items: QuestionnaireResponseItem[]): [QuestionnaireResponseItem[] ,QuestionnaireResponseItem[]] {
+        var children = items.filter(item => item.linkId === linkId);
+        
+        if (children.length > 0) {
+            return [items, children];
+        } else {
+            for (var item of items) {
+                if(item.item && item.item.length > 0) {
+                    var [unused, resultFromChild] = getItemsByLinkId(linkId, item.item);
+                    if (resultFromChild.length > 0) {
+                        return [unused, resultFromChild];
+                    }
+                }
+            }
+        }
+        return [[],[]];
     }
 
     function getItemByLinkId(linkId: string, items: QuestionnaireResponseItem[]): QuestionnaireResponseItem | undefined {

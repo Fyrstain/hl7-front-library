@@ -15,7 +15,7 @@ export interface DefaultFieldConf {
     pattern?: string;
     placeholder?: string;
     advancedRendering: { [key: string]: string };
-    disabled: (form: { [key: string]: string[] }) => boolean;
+    disabled: (form: { [key: string]: string[] }, questionId: string) => boolean;
     hideOnDisabled: boolean;
     readOnly: boolean;
     required: boolean;
@@ -90,7 +90,7 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
                     pattern={configs.pattern}
                     placeholder={configs.placeholder}
                     style={configs.advancedRendering}
-                    disabled={configs.disabled(configs.form)}
+                    disabled={configs.disabled(configs.form, configs.id)}
                     readOnly={configs.readOnly}
                     required={configs.required}
                     value={configs.values[0]}
@@ -118,7 +118,7 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
                                     pattern={configs.pattern}
                                     placeholder={configs.placeholder}
                                     style={configs.advancedRendering}
-                                    disabled={configs.disabled(configs.form)}
+                                    disabled={configs.disabled(configs.form, configs.id)}
                                     readOnly={configs.readOnly}
                                     required={configs.required}
                                     value={value}

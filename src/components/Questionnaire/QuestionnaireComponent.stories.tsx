@@ -70,7 +70,7 @@ export const QuestionnaireROTSurPass: StoryObj<QuestionnaireProps> = {
         sdcUrl: 'https://integ.fyrstain.com/r4/questionnaire-processor',
         terminologyUrl: 'https://integ.fyrstain.com/r4-data',
         questionnaireUrl: "http://hl7.eu/fhir/ig/pcsp/Questionnaire/ROTSurPass",
-        onSubmit: (response) => { console.log("Submitted response:", response); },
+        onSubmit: (response) => { console.log("Submitted response:", JSON.stringify(response)); },
         onError: () => { },
     },
 };

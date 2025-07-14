@@ -126,7 +126,7 @@ const SelectField: React.FC<FieldConfig> = (configs) => {
                 <Form.Select
                     value={configs.form[configs.field.id][0]}
                     style={configs.field.advancedRendering}
-                    disabled={configs.field.readOnly || configs.field.disabled(configs.form)}
+                    disabled={configs.field.readOnly || configs.field.disabled(configs.form, configs.field.id)}
                     required={configs.field.required}
                     name={configs.field.id}
                     onChange={handleChange}
@@ -156,7 +156,7 @@ const SelectField: React.FC<FieldConfig> = (configs) => {
                                     name={configs.field.id + index}
                                     value={value}
                                     style={configs.field.advancedRendering}
-                                    disabled={configs.field.readOnly || configs.field.disabled(configs.form)}
+                                    disabled={configs.field.readOnly || configs.field.disabled(configs.form, configs.field.id)}
                                     required={configs.field.required}
                                     onChange={handleChange}
                                 >
