@@ -14,6 +14,7 @@ import SelectField from "./SelectField";
 import { Field, QuantityField } from ".";
 import DateTimeField from "./DateTimeField";
 import TimeField from "./TimeField";
+import AttachmentField from "./AttachmentField";
 
 ////////////////////////////
 //        Class           //
@@ -74,6 +75,7 @@ export class FieldRenderer {
                 return <QuantityField field={field} form={form} updateForm={updateForm} valueSetLoader={valueSetLoader}/>;
             case 'time':
             case 'attachment':
+                return <AttachmentField field={field} form={form} updateForm={updateForm} valueSetLoader={valueSetLoader}/>;
             case 'reference':
             case 'question':
             default:

@@ -93,10 +93,11 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
                     disabled={configs.disabled(configs.form, configs.id)}
                     readOnly={configs.readOnly}
                     required={configs.required}
-                    value={configs.values[0]}
+                    {...(configs.type !== 'file' && { value: configs.values[0] })}
                     maxLength={configs.maxLength}
                     onChange={configs.handleChange}
                     step={configs.type === "time" ? "1" : "any"}
+                    accept={configs.type === "file" ? "*/*" : undefined}
                 />
                 <Form.Control.Feedback type="invalid">
                     {configs.getValidationMessage ? configs.getValidationMessage() : getValidationMessage()}
@@ -121,10 +122,11 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
                                     disabled={configs.disabled(configs.form, configs.id)}
                                     readOnly={configs.readOnly}
                                     required={configs.required}
-                                    value={value}
+                                    {...(configs.type !== 'file' && { value: value })}
                                     maxLength={configs.maxLength}
                                     onChange={configs.handleChange}
                                     step="any"
+                                    accept={configs.type === "file" ? "*/*" : undefined}
                                 />
                                 {index !== 0 &&
                                     <FontAwesomeIcon

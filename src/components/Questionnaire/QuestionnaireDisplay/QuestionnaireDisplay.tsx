@@ -563,6 +563,8 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                         }
                         break;
                     case 'attachment':
+                        item.answer = mapToAttachmentAnswer(value);
+                        break;
                     case 'reference':
                     default:
                         //TODO
@@ -699,6 +701,41 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 }
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
+        return answer.length > 0 ? answer : undefined;
+    }
+
+    /**
+     * Function to map attachment values to QuestionnaireResponseItemAnswer.
+     * 
+     * @param value the value of the attachment field.
+     * @returns a list of QuestionnaireResponseItemAnswer or undefined if no valid attachment found.
+     */
+    function mapToAttachmentAnswer(
+        value: string[]
+    ): QuestionnaireResponseItemAnswer[] | undefined {
+        const answer = value
+        .map((value) => {
+            // If the value is empty, return undefined
+            if (value === "") {
+            return undefined;
+            }
+            // Try to parse the value as a JSON object
+            try {
+            const attachmentObj = JSON.parse(value);
+            return {
+                valueAttachment: {
+                contentType: attachmentObj.contentType,
+                data: attachmentObj.data,
+                title: attachmentObj.title,
+                },
+            } as QuestionnaireResponseItemAnswer;
+            } catch (error) {
+            console.error("Error parsing attachment value:", error);
+            return undefined;
+            }
+        })
+        .filter((v): v is QuestionnaireResponseItemAnswer => !!v);
+        // Return the answer if it has valid items, otherwise return undefined
         return answer.length > 0 ? answer : undefined;
     }
 
