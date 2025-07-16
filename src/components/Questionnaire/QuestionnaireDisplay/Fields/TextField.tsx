@@ -28,6 +28,13 @@ const TextField: React.FC<FieldConfig> = (configs) => {
     //     }
     // }, [configs.form]);
 
+    /**
+     * Check if the label should be shown.
+     * If the label is empty or only contains spaces, it should not be shown.
+     */
+    const shouldShowLabel =
+        configs.field.label && configs.field.label.trim() !== "";
+
     ////////////////////////////////
     //          Content           //
     ////////////////////////////////
@@ -35,8 +42,12 @@ const TextField: React.FC<FieldConfig> = (configs) => {
     return (
         <Form.Group key={configs.field.id}>
             <Form.Label>
-                <b>{configs.field.prefix && configs.field.prefix} </b>
-                {configs.field.label} {configs.field.required && "* "}:
+                {shouldShowLabel && (
+                    <>
+                        <b>{configs.field.prefix && configs.field.prefix} </b>
+                        {configs.field.label} {configs.field.required && "* "}:
+                    </>
+                )}
             </Form.Label>
             <Form.Control
                 name={configs.field.id}

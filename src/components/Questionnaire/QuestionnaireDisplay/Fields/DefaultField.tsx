@@ -73,6 +73,12 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
         configs.updateForm(newForm);
     }
 
+    /**
+     * Check if the label should be shown. 
+     * If no label (field 'Text' on the Questionnaire) is provided, it won't be shown.
+     */
+    const shouldShowLabel = configs.label && configs.label.trim() !== "";
+
     ////////////////////////////////
     //          Content           //
     ////////////////////////////////
@@ -80,10 +86,12 @@ const DefaultField: React.FC<DefaultFieldConf> = (configs) => {
     return (
         <div className='field'>{!configs.repeat &&
             <Form.Group key={configs.id}>
-                <Form.Label>
-                    <b>{configs.prefix && configs.prefix} </b>
-                    {configs.label} {configs.required && "* "}:
-                </Form.Label>
+                {shouldShowLabel && (
+                    <Form.Label>
+                        <b>{configs.prefix && configs.prefix} </b>
+                        {configs.label} {configs.required && "* "}:
+                    </Form.Label>
+                )}
                 <Form.Control
                     name={configs.id}
                     type={configs.type}
