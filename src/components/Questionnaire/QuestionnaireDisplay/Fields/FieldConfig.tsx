@@ -11,7 +11,7 @@ export interface Field {
     placeholder?: string;
     advancedRendering: { [key: string]: string };
     hidden: boolean;
-    disabled: (form: { [key: string]: string[] }) => boolean;
+    disabled: (form: { [key: string]: string[] }, questionId: string) => boolean;
     hideOnDisabled: boolean;
     readOnly: boolean;
     required: boolean;
