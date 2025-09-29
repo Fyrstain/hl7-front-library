@@ -1,6 +1,6 @@
 {
-  "name": "hl7-front-library",
-  "version": "0.0.19-SNAPSHOT",
+  "name": "@fyrstain/hl7-front-library",
+  "version": "0.0.20-SNAPSHOT",
   "description": "Library of React components that can be used in front-end applications",
   "proxy": "http://localhost:3000",
   "scripts": {
