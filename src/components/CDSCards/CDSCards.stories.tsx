@@ -1,5 +1,6 @@
-import React from "react";
+// Component
 import CDSCards from "./CDSCards";
+// Storybook
 import type { Meta, StoryObj } from "@storybook/react";
 
 export default {

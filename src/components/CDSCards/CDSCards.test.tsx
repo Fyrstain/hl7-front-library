@@ -1,7 +1,15 @@
+// React
 import React from "react";
+// Testing Library
 import { render, screen } from "@testing-library/react";
 import "@testing-library/jest-dom";
-import CDSCards from "./CDSCards";
+// Component
+import { CDSCards } from "./CDSCards";
+
+// Mock FontAwesomeIcon pour les tests
+jest.mock("@fortawesome/react-fontawesome", () => ({
+  FontAwesomeIcon: (props: any) => <span data-testid={props.title || "icon"} />
+}));
 
 describe("CDSCards component", () => {
   test("renders message when no cards are provided", () => {
@@ -11,7 +19,7 @@ describe("CDSCards component", () => {
 
   test("renders a list of cards", () => {
     const cards = [
-      { summary: "Card 1", detail: "Detail 1" },
+      { summary: "Card 1", detail: "Detail 1", indicator: "info" },
       { summary: "Card 2", indicator: "warning", detail: "Detail 2" },
     ];
 
@@ -23,28 +31,29 @@ describe("CDSCards component", () => {
     expect(screen.getByText("Detail 2")).toBeInTheDocument();
   });
 
-  test("renders critical indicator with ❗ emoji", () => {
+  test("renders critical indicator icon", () => {
     const cards = [{ summary: "Critical card", indicator: "critical" }];
     render(<CDSCards cards={cards} />);
-    expect(screen.getByText("❗")).toBeInTheDocument();
+    expect(screen.getByTestId("Critical alert")).toBeInTheDocument();
   });
 
-  test("renders warning indicator with ⚠️ emoji", () => {
+  test("renders warning indicator icon", () => {
     const cards = [{ summary: "Warning card", indicator: "warning" }];
     render(<CDSCards cards={cards} />);
-    expect(screen.getByText("⚠️")).toBeInTheDocument();
+    expect(screen.getByTestId("Warning")).toBeInTheDocument();
   });
 
-  test("renders info indicator with ℹ️ emoji by default", () => {
-    const cards = [{ summary: "Info card" }];
+  test("renders info indicator icon by default", () => {
+    const cards = [{ summary: "Info card", indicator: "info" }];
     render(<CDSCards cards={cards} />);
-    expect(screen.getByText("ℹ️")).toBeInTheDocument();
+    expect(screen.getByTestId("Information")).toBeInTheDocument();
   });
 
   test("renders source link correctly", () => {
     const cards = [
       {
         summary: "Card with source",
+        indicator: "info",
         source: { url: "https://example.com", label: "Example Source" },
       },
     ];
@@ -57,6 +66,7 @@ describe("CDSCards component", () => {
     const cards = [
       {
         summary: "Card with suggestions",
+        indicator: "info",
         suggestions: [
           {
             label: "Try something",
@@ -68,7 +78,7 @@ describe("CDSCards component", () => {
 
     render(<CDSCards cards={cards} />);
 
-    expect(screen.getByText("💡 Suggestions:")).toBeInTheDocument();
+    expect(screen.getByText("Suggestions:")).toBeInTheDocument();
     expect(screen.getByText("Try something")).toBeInTheDocument();
     expect(screen.getByText("Do this")).toBeInTheDocument();
     expect(screen.getByText("Do that")).toBeInTheDocument();
@@ -78,6 +88,7 @@ describe("CDSCards component", () => {
     const cards = [
       {
         summary: "Card with links",
+        indicator: "info",
         links: [
           { url: "https://example1.com", label: "Link 1" },
           { url: "https://example2.com", label: "Link 2" },
