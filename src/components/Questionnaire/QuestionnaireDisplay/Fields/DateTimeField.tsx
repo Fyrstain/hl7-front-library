@@ -21,7 +21,7 @@ const DateTimeField: React.FC<FieldConfig> = (configs) => {
             index = parseInt(event.target.name.replace(configs.field.id, ''));
         }
         var newForm = { ...configs.form };
-        newForm[configs.field.id][index] = event.target.value;
+        newForm[configs.field.id][index] = event.target.value + "Z";
         configs.updateForm(newForm);
     };
 
