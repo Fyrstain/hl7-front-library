@@ -25,6 +25,21 @@ const DateTimeField: React.FC<FieldConfig> = (configs) => {
         configs.updateForm(newForm);
     };
 
+    /**
+     * Trim the Z put in the string above
+     * 
+     * @param values the values for the field.
+     * @returns trimmed values, for display.
+     */
+    function trimZ(values: string[]): string[] {
+        return values.map(v => {
+            if (v && v.endsWith("Z")) {
+                return v.slice(0, -1);
+            }
+            return v;
+        });
+    }
+
     ////////////////////////////////
     //          Content           //
     ////////////////////////////////
@@ -42,7 +57,7 @@ const DateTimeField: React.FC<FieldConfig> = (configs) => {
             readOnly={configs.field.readOnly}
             required={configs.field.required}
             repeat={configs.field.repeat}
-            values={configs.form[configs.field.id] || ['']}
+            values={configs.form[configs.field.id] ? trimZ(configs.form[configs.field.id]) : ['']}
             maxLength={configs.field.maxLength}
             getValidationMessage={() => "This field is required."}
             handleChange={handleChange}
