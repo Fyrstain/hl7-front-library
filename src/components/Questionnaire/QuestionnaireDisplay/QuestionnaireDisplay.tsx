@@ -682,7 +682,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 return undefined;
             }
             return {
-                valueDateTime: value + ':00'
+                valueDateTime: value + ':00Z'
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         return answer.length > 0 ? answer : undefined;
