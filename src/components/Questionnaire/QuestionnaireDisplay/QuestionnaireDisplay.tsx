@@ -238,7 +238,14 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 case 'date':
                     return (answers[0].valueDate ?? '') as string;
                 case 'dateTime':
-                    return (answers[0].valueDateTime ?? '') as string;
+                    if (answers[0].valueDateTime) {
+                        if (answers[0].valueDateTime.endsWith("Z")) {
+                            return answers[0].valueDateTime.slice(0, -4) as string;
+                        } else {
+                            return answers[0].valueDateTime
+                        }
+                    } 
+                    return '' as string;
                 case 'time':
                     return (answers[0].valueTime ?? '') as string;
                 case 'text':
