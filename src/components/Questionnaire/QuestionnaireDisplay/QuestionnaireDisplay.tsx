@@ -238,7 +238,14 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 case 'date':
                     return (answers[0].valueDate ?? '') as string;
                 case 'dateTime':
-                    return (answers[0].valueDateTime ?? '') as string;
+                    if (answers[0].valueDateTime) {
+                        if (answers[0].valueDateTime.endsWith("Z")) {
+                            return answers[0].valueDateTime.slice(0, -4) as string;
+                        } else {
+                            return answers[0].valueDateTime
+                        }
+                    } 
+                    return '' as string;
                 case 'time':
                     return (answers[0].valueTime ?? '') as string;
                 case 'text':
@@ -682,7 +689,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 return undefined;
             }
             return {
-                valueDateTime: value + ':00'
+                valueDateTime: value + ':00Z'
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         return answer.length > 0 ? answer : undefined;
