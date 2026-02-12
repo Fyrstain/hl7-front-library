@@ -1222,8 +1222,67 @@ const qr = {
 const questionnaire = (qr as any).contained?.[0];
 
 const valueSetLoaderMock = {
-  searchValueSet: async (_url: string) => [],
-  toCodeableConcept: (code: any) => ({ coding: [code] }),
+  searchValueSet: async (url: string) => {
+    const u = (url ?? "").toLowerCase();
+    
+    if (u.includes("vs-biopsytype")) {
+      return [
+        { system: "http://snomed.info/sct", code: "27582007", display: "Prostate biopsy" },
+        { system: "http://snomed.info/sct", code: "86273004", display: "Biopsy" },
+        { system: "http://snomed.info/sct", code: "274214007", display: "Needle biopsy" },
+      ];
+    }
+
+    if (u.includes("vs-pca")) {
+      return [
+        { system: "http://snomed.info/sct", code: "715412008", display: "Prostate cancer (disorder)" },
+        { system: "http://snomed.info/sct", code: "399068003", display: "Family history of malignant neoplasm of prostate" },
+        { system: "http://snomed.info/sct", code: "260385009", display: "Negative" },
+      ];
+    }
+
+    if (u.includes("vs-dreoutcomecode")) {
+      return [
+        { system: "http://snomed.info/sct", code: "131196009", display: "Abnormal digital rectal examination" },
+        { system: "http://snomed.info/sct", code: "17621005", display: "Normal" },
+        { system: "http://snomed.info/sct", code: "260385009", display: "Negative" },
+      ];
+    }
+
+    if (u.includes("dicom.nema.org") && u.includes("cid_29")) {
+      return [
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "PA", display: "Photoacoustic" },
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "MR", display: "Magnetic Resonance" },
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "CT", display: "Computed Tomography" },
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "US", display: "Ultrasound" },
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "CR", display: "Computed Radiography" },
+        { system: "http://dicom.nema.org/resources/ontology/DCM", code: "DX", display: "Digital Radiography" },
+      ];
+    }
+
+    if (u.includes("vs-sopclass")) {
+      return [
+        {
+          system: "urn:ietf:rfc:3986",
+          code: "urn:oid:1.2.840.10008.5.1.4.1.1.4.4",
+          display: "MR Spectroscopy Storage",
+        },
+        {
+          system: "urn:ietf:rfc:3986",
+          code: "urn:oid:1.2.840.10008.5.1.4.1.1.2",
+          display: "CT Image Storage",
+        },
+        {
+          system: "urn:ietf:rfc:3986",
+          code: "urn:oid:1.2.840.10008.5.1.4.1.1.4",
+          display: "MR Image Storage",
+        },
+      ];
+    }
+
+    return [];
+  },
+  toCodeableConcept: (coding: any) => ({ coding: [coding] }),
 } as any;
 
 
