@@ -67,7 +67,11 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             ?.map(item => getFieldFromItem(item, []))
             .flat();
         setFields(fetchedFields ?? []);
-        setForm(fetchedFields ? getFormFromFields(fetchedFields, {}) : {});
+        setForm(
+            fetchedFields
+                ? buildFormFromQuestionnaireAndResponse(fetchedFields, configs.questionnaireResponse.item, {})
+                : {}
+        );
     }, [configs]);
 
     /**
@@ -244,7 +248,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                         } else {
                             return answers[0].valueDateTime
                         }
-                    } 
+                    }
                     return '' as string;
                 case 'time':
                     return (answers[0].valueTime ?? '') as string;
@@ -303,7 +307,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 return (form, idInForm) => enableFunctions.every(f => {
                     console.log("Evaluating field enabled for %s", idInForm)
                     f(form, idInForm)
-            }) && item.disabledDisplay !== 'protected';
+                }) && item.disabledDisplay !== 'protected';
             } else {
                 return (form, idInForm) => enableFunctions.some(f => f(form, idInForm)) && item.disabledDisplay !== 'protected';
             }
@@ -447,7 +451,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     * Reset the form.
     */
     function onReset() {
-        setForm(getFormFromFields(fields, {}));
+        setForm(buildFormFromQuestionnaireAndResponse(fields, configs.questionnaireResponse.item, {}));
         setValidated(false);
     }
 
@@ -472,112 +476,153 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     ////////////////////////////////
 
     function addAnswers(questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }): QuestionnaireResponse {
-        for (const [key, value] of Object.entries(form)) {
-            var item = undefined;
-            if (questionnaireResponse.item) {
-                if (!key.includes('@@')) {
-                    item = getItemByLinkId(key, questionnaireResponse.item);
-                } else {
-                    // 1. Split ID (see for recursion)
-                    const [groupId, groupIndexStr, subFieldId] = key.split("@@");
-                    const groupIndex = parseInt(groupIndexStr, 10);
+        const deepCloneWithoutAnswers = (base: any) => {
+            const cloned = JSON.parse(JSON.stringify(base));
 
-                    // 2. Find group item
-                    var [parent, groupItems] = getItemsByLinkId(groupId, questionnaireResponse.item);
-                    if (!groupItems || groupItems.length === 0) {
-                        console.warn(`Group ${groupId} not found in QuestionnaireResponse`);
-                    } else {
-                        while (groupItems.length <= groupIndex) {
-                            const base = groupItems[0];
-                            const cloned = JSON.parse(JSON.stringify(base));
-                            cloned.item?.forEach((i: { answer: any; }) => delete i.answer);
-                            groupItems.push(cloned);
-                            parent.push(cloned);
-                        }
-                        const repeatedInstance = groupItems[groupIndex];
-
-                        // 4. Find subitem
-                        item = repeatedInstance.item?.find(i => i.linkId === subFieldId);
-                        if (!item) {
-                            console.warn(`Subfield ${subFieldId} not found in group ${groupId} iteration ${groupIndex}`);
-                        }
-                    }
+            const clear = (it: any) => {
+                if (it && typeof it === "object") {
+                    delete it.answer;
+                    if (Array.isArray(it.item)) it.item.forEach(clear);
                 }
+            };
+            clear(cloned);
+
+            return cloned;
+        };
+
+        const resolveItemByKeyPath = (
+            key: string,
+            rootItems: QuestionnaireResponseItem[]
+        ): QuestionnaireResponseItem | undefined => {
+            const parts = key.split("@@");
+
+            if (parts.length === 1) {
+                return getItemByLinkId(parts[0], rootItems);
             }
-            if (item) {
-                var originalFieldKey = undefined;
-                if (key.includes('@@')) {
-                    const [groupId, groupIndexStr, subFieldId] = key.split("@@");
-                    originalFieldKey = subFieldId;
-                } else {
-                    originalFieldKey = key;
+
+            let currentItems: QuestionnaireResponseItem[] = rootItems;
+
+            for (let i = 0; i < parts.length - 1; i += 2) {
+                const groupId = parts[i];
+                const groupIndexStr = parts[i + 1];
+                const groupIndex = parseInt(groupIndexStr, 10);
+
+                if (Number.isNaN(groupIndex)) {
+                    console.warn(`Invalid group index "${groupIndexStr}" in key "${key}"`);
+                    return undefined;
                 }
-                var type = getFieldType(originalFieldKey, fields);
-                switch (type) {
-                    case 'date':
-                        item.answer = mapToDateAnswer(value);
-                        break;
-                    case 'decimal':
-                        item.answer = mapToDecimalAnswer(value);
-                        break;
-                    case 'integer':
-                        item.answer = mapToIntegerAnswer(value);
-                        break;
-                    case 'url':
-                        item.answer = mapToUrlAnswer(value);
-                        break;
-                    case 'boolean':
-                        item.answer = mapToBooleanAnswer(value);
-                        break;
-                    case 'text':
-                    case 'string':
-                        item.answer = mapToStringAnswer(value);
-                        break;
-                    case 'coding':
+
+                const [parentArray, groupItems] = getItemsByLinkId(groupId, currentItems);
+
+                if (!groupItems || groupItems.length === 0) {
+                    console.warn(`Group ${groupId} not found at this level for key "${key}"`);
+                    return undefined;
+                }
+
+                while (groupItems.length <= groupIndex) {
+                    const base = groupItems[0];
+                    const cloned = deepCloneWithoutAnswers(base);
+                    parentArray.push(cloned);
+                    groupItems.push(cloned);
+                }
+
+                const repeatedInstance = groupItems[groupIndex];
+                if (!repeatedInstance.item) repeatedInstance.item = [];
+
+                currentItems = repeatedInstance.item as QuestionnaireResponseItem[];
+            }
+
+            const leafId = parts[parts.length - 1];
+            const leaf = currentItems.find((i) => i.linkId === leafId);
+
+            if (!leaf) {
+                console.warn(`Leaf ${leafId} not found for key "${key}"`);
+                return undefined;
+            }
+            return leaf;
+        };
+
+        for (const [key, value] of Object.entries(form)) {
+            let item: QuestionnaireResponseItem | undefined;
+
+            if (questionnaireResponse.item) {
+                item = resolveItemByKeyPath(key, questionnaireResponse.item);
+            }
+
+            if (!item) continue;
+
+            const originalFieldKey = key.includes("@@") ? key.split("@@").at(-1)! : key;
+            const type = getFieldType(originalFieldKey, fields);
+
+            if (type === "group" || type === "display") continue;
+
+            switch (type) {
+                case "date":
+                    item.answer = mapToDateAnswer(value);
+                    break;
+                case "decimal":
+                    item.answer = mapToDecimalAnswer(value);
+                    break;
+                case "integer":
+                    item.answer = mapToIntegerAnswer(value);
+                    break;
+                case "url":
+                    item.answer = mapToUrlAnswer(value);
+                    break;
+                case "boolean":
+                    item.answer = mapToBooleanAnswer(value);
+                    break;
+                case "text":
+                case "string":
+                    item.answer = mapToStringAnswer(value);
+                    break;
+                case "coding":
+                    item.answer = mapToCodingAnswer(value);
+                    break;
+                case "dateTime":
+                    item.answer = mapToDateTimeAnswer(value);
+                    break;
+                case "time":
+                    item.answer = mapToTimeAnswer(value);
+                    break;
+                case "quantity":
+                    item.answer = mapToQuantityAnswer(value);
+                    break;
+                case "choice": {
+                    const field = getField(originalFieldKey, fields);
+
+                    if (field?.answerValueSet) {
                         item.answer = mapToCodingAnswer(value);
                         break;
-                    case 'dateTime':
-                        item.answer = mapToDateTimeAnswer(value);
+                    }
+
+                    if (field && (field.answerOption?.length ?? 0) > 0) {
+                        const firstOption = field.answerOption![0];
+                        // It is implied that all options have the same type here
+                        if (firstOption?.valueInteger) item.answer = mapToIntegerAnswer(value);
+                        else if (firstOption?.valueDate) item.answer = mapToDateAnswer(value);
+                        else if (firstOption?.valueTime) item.answer = mapToTimeAnswer(value);
+                        else if (firstOption?.valueString) item.answer = mapToStringAnswer(value);
+                        else if (firstOption?.valueCoding) item.answer = mapToCodingAnswer(value);
+                        else if (firstOption?.valueReference)
+                            console.log(
+                                "Cannot convert answers for field [%s] of type [%s]",
+                                key,
+                                "reference (option)"
+                            );
                         break;
-                    case 'time':
-                        item.answer = mapToTimeAnswer(value);
-                        break;
-                    case 'quantity':
-                        item.answer = mapToQuantityAnswer(value);
-                        break;
-                    case 'choice':
-                        if (getField(originalFieldKey, fields)?.answerValueSet) {
-                            item.answer = mapToCodingAnswer(value);
-                        } else if (getField(originalFieldKey, fields) && (getField(originalFieldKey, fields)?.answerOption?.length ?? 0) > 0) {
-                            const firstOption = getField(originalFieldKey, fields)?.answerOption[0];
-                            // It is implied that all options have the same type here
-                            if (firstOption?.valueInteger) {
-                                item.answer = mapToIntegerAnswer(value);
-                            } else if (firstOption?.valueDate) {
-                                item.answer = mapToDateAnswer(value);
-                            } else if (firstOption?.valueTime) {
-                                item.answer = mapToTimeAnswer(value);
-                            } else if (firstOption?.valueString) {
-                                item.answer = mapToStringAnswer(value);
-                            } else if (firstOption?.valueCoding) {
-                                item.answer = mapToCodingAnswer(value);
-                            } else if (firstOption?.valueReference) {
-                                console.log("Cannot convert answers for field [%s] of type [%s]", key, "reference (option)");
-                            }
-                            break;
-                        } else {
-                            item.answer = undefined;
-                        }
-                        break;
-                    case 'attachment':
-                        item.answer = mapToAttachmentAnswer(value);
-                        break;
-                    case 'reference':
-                    default:
-                        //TODO
-                        console.log("Cannot convert answers for field [%s] of type [%s]", key, type);
-                        break;
+                    }
+                    item.answer = undefined;
+                    break;
                 }
+                case "attachment":
+                    item.answer = mapToAttachmentAnswer(value);
+                    break;
+                case "reference":
+                default:
+                    //TODO
+                    console.log("Cannot convert answers for field [%s] of type [%s]", key, type);
+                    break;
             }
         }
         return questionnaireResponse;
@@ -721,39 +766,39 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         value: string[]
     ): QuestionnaireResponseItemAnswer[] | undefined {
         const answer = value
-        .map((value) => {
-            // If the value is empty, return undefined
-            if (value === "") {
-            return undefined;
-            }
-            // Try to parse the value as a JSON object
-            try {
-            const attachmentObj = JSON.parse(value);
-            return {
-                valueAttachment: {
-                contentType: attachmentObj.contentType,
-                data: attachmentObj.data,
-                title: attachmentObj.title,
-                },
-            } as QuestionnaireResponseItemAnswer;
-            } catch (error) {
-            console.error("Error parsing attachment value:", error);
-            return undefined;
-            }
-        })
-        .filter((v): v is QuestionnaireResponseItemAnswer => !!v);
+            .map((value) => {
+                // If the value is empty, return undefined
+                if (value === "") {
+                    return undefined;
+                }
+                // Try to parse the value as a JSON object
+                try {
+                    const attachmentObj = JSON.parse(value);
+                    return {
+                        valueAttachment: {
+                            contentType: attachmentObj.contentType,
+                            data: attachmentObj.data,
+                            title: attachmentObj.title,
+                        },
+                    } as QuestionnaireResponseItemAnswer;
+                } catch (error) {
+                    console.error("Error parsing attachment value:", error);
+                    return undefined;
+                }
+            })
+            .filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         // Return the answer if it has valid items, otherwise return undefined
         return answer.length > 0 ? answer : undefined;
     }
 
-    function getItemsByLinkId(linkId: string, items: QuestionnaireResponseItem[]): [QuestionnaireResponseItem[] ,QuestionnaireResponseItem[]] {
+    function getItemsByLinkId(linkId: string, items: QuestionnaireResponseItem[]): [QuestionnaireResponseItem[], QuestionnaireResponseItem[]] {
         var children = items.filter(item => item.linkId === linkId);
-        
+
         if (children.length > 0) {
             return [items, children];
         } else {
             for (var item of items) {
-                if(item.item && item.item.length > 0) {
+                if (item.item && item.item.length > 0) {
                     var [unused, resultFromChild] = getItemsByLinkId(linkId, item.item);
                     if (resultFromChild.length > 0) {
                         return [unused, resultFromChild];
@@ -761,7 +806,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 }
             }
         }
-        return [[],[]];
+        return [[], []];
     }
 
     function getItemByLinkId(linkId: string, items: QuestionnaireResponseItem[]): QuestionnaireResponseItem | undefined {
@@ -795,6 +840,163 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             }
             return undefined;
         }).find(item => item !== undefined);
+    }
+
+    function deepCloneWithoutAnswers(item: any) {
+        const cloned = JSON.parse(JSON.stringify(item));
+        const clear = (it: any) => {
+            delete it.answer;
+            if (Array.isArray(it.item)) it.item.forEach(clear);
+        };
+        clear(cloned);
+        return cloned;
+    }
+
+    function resolveItemByKeyPath(
+        key: string,
+        questionnaireResponseItems: QuestionnaireResponseItem[]
+    ): QuestionnaireResponseItem | undefined {
+        const parts = key.split("@@");
+
+        if (parts.length === 1) {
+            return getItemByLinkId(parts[0], questionnaireResponseItems);
+        }
+
+        let currentItems = questionnaireResponseItems;
+
+        for (let i = 0; i < parts.length - 1; i += 2) {
+            const groupId = parts[i];
+            const groupIndex = parseInt(parts[i + 1], 10);
+            if (Number.isNaN(groupIndex)) return undefined;
+
+            const [parentArray, groupItems] = getItemsByLinkId(groupId, currentItems);
+            if (!groupItems || groupItems.length === 0) return undefined;
+
+            while (groupItems.length <= groupIndex) {
+                const base = groupItems[0];
+                const cloned = deepCloneWithoutAnswers(base);
+                parentArray.push(cloned);
+                groupItems.push(cloned);
+            }
+
+            const instance = groupItems[groupIndex];
+            currentItems = instance.item ?? [];
+        }
+
+        const leafId = parts[parts.length - 1];
+        return currentItems.find(i => i.linkId === leafId);
+    }
+
+    function buildFormFromQuestionnaireAndResponse(
+        fields: Field[],
+        responseItems: QuestionnaireResponseItem[] | undefined,
+        form: { [key: string]: string[] } = {}
+    ): { [key: string]: string[] } {
+        const leafId = (id: string) => id.split("@@").at(-1)!;
+
+        for (const field of fields) {
+            const fhirId = leafId(field.id);
+
+            if (field.type === "group") {
+                const groupOcc = responseItems
+                    ? responseItems.filter((it) => it.linkId === fhirId)
+                    : [];
+
+                if (!field.repeat) {
+                    const scopedItems = groupOcc[0]?.item ?? [];
+                    if (field.subField?.length) {
+                        form = buildFormFromQuestionnaireAndResponse(field.subField, scopedItems, form);
+                    }
+                    continue;
+                }
+
+                const count = Math.max(groupOcc.length, 1);
+
+                form[field.id] = Array.from({ length: count }, () => field.initialValue ?? "");
+
+                for (let idx = 0; idx < count; idx++) {
+                    const scopedItems = groupOcc[idx]?.item ?? [];
+
+                    if (field.subField?.length) {
+                        const prefixedSubFields = field.subField.map((sf) => ({
+                            ...sf,
+                            id: `${field.id}@@${idx}@@${leafId(sf.id)}`,
+                        })) as Field[];
+
+                        form = buildFormFromQuestionnaireAndResponse(prefixedSubFields, scopedItems, form);
+                    }
+                }
+
+                continue;
+            }
+
+            const item = responseItems ? responseItems.find((it) => it.linkId === fhirId) : undefined;
+            const answers = item?.answer ?? [];
+            form[field.id] = [getInitialValueFromAnswers(field, answers)];
+        }
+
+        return form;
+    }
+
+    function getInitialValueFromAnswers(
+        field: Field,
+        answers: QuestionnaireResponseItemAnswer[]
+    ): string {
+        const type = field.type;
+
+        if (!answers || answers.length === 0) {
+            if (type === "choice" && field.answerOption?.length) {
+                const initialSelected = field.answerOption.find((o) => o.initialSelected);
+                if (initialSelected?.valueCoding) {
+                    return `${initialSelected.valueCoding.system}|${initialSelected.valueCoding.code}`;
+                }
+            }
+            return field.initialValue ?? "";
+        }
+
+        switch (type) {
+            case "choice":
+            case "coding":
+                return answers[0].valueCoding
+                    ? `${answers[0].valueCoding.system}|${answers[0].valueCoding.code}`
+                    : "";
+
+            case "quantity":
+                return answers[0].valueQuantity
+                    ? `${answers[0].valueQuantity.value}|${answers[0].valueQuantity.unit}`
+                    : "";
+
+            case "decimal":
+                return answers[0].valueDecimal !== undefined ? String(answers[0].valueDecimal) : "";
+
+            case "integer":
+                return answers[0].valueInteger !== undefined ? String(answers[0].valueInteger) : "";
+
+            case "url":
+                return answers[0].valueUri ?? "";
+
+            case "boolean":
+                return answers[0].valueBoolean !== undefined ? String(answers[0].valueBoolean) : "";
+
+            case "date":
+                return answers[0].valueDate ?? "";
+
+            case "dateTime":
+                if (answers[0].valueDateTime) {
+                    return answers[0].valueDateTime.endsWith("Z")
+                        ? answers[0].valueDateTime.slice(0, -4)
+                        : answers[0].valueDateTime;
+                }
+                return "";
+
+            case "time":
+                return answers[0].valueTime ?? "";
+
+            case "text":
+            case "string":
+            default:
+                return answers[0].valueString ?? "";
+        }
     }
 
     ////////////////////////////////
