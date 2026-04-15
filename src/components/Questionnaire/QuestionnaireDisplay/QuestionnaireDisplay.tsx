@@ -286,6 +286,14 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                             return (answers[0].valueString ?? '') as string;
                         }
                         //TODO Reference
+                    } else {
+                        if (answers[0].valueCoding) {
+                            return answers[0].valueCoding.system + '|' + answers[0].valueCoding.code;
+                        } else {
+                        //TODO Support reference options
+                            var value = answers[0].valueInteger ?? answers[0].valueTime ?? answers[0].valueDate ?? answers[0].valueString;
+                            return value as string;
+                        }
                     }
                 case 'quantity':
                     return (answers[0].valueQuantity ? answers[0].valueQuantity.value + "|" + answers[0].valueQuantity.unit : '') as string;
