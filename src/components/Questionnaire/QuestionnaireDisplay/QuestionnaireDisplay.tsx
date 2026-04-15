@@ -8,6 +8,7 @@ import Title from '../../Title/Title';
 import { Extension, Questionnaire, QuestionnaireItem, QuestionnaireItemEnableWhen, QuestionnaireResponse, QuestionnaireResponseItem, QuestionnaireResponseItemAnswer } from 'fhir/r5';
 import { Field, FieldRenderer } from './Fields';
 import { ValueSetLoader } from '../../../services';
+import { VariableDefinition, CalculatedExpressionDefinition } from './Fields/FieldConfig'
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireDisplayProps {
@@ -41,6 +42,9 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-widthPercentage': 'width',
     };
 
+    const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
+    const CALCULATED_EXPRESSION_URL = 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression';
+
     ////////////////////////////////
     //           State            //
     ////////////////////////////////
@@ -49,6 +53,42 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [fields, setFields] = useState<Field[]>([]);
     const [form, setForm] = useState<{ [key: string]: string[] }>({});
     const [validated, setValidated] = useState(false);
+
+    function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
+        if (!extensions) {
+            return [];
+        }
+
+        return extensions
+            .filter(ext => ext.url === VARIABLE_EXTENSION_URL && ext.valueExpression)
+            .map(ext => ({
+                name: ext.valueExpression?.name ?? '',
+                expression: ext.valueExpression?.expression ?? '',
+                language: ext.valueExpression?.language
+            }))
+            .filter(v => v.name !== '' && v.expression !== '');
+    }
+
+    function getCalculatedExpression(extensions?: Extension[]): CalculatedExpressionDefinition | undefined {
+        if (!extensions) {
+            return undefined;
+        }
+
+        const ext = extensions.find(e =>
+            e.url === CALCULATED_EXPRESSION_URL &&
+            e.valueExpression &&
+            e.valueExpression.expression
+        );
+
+        if (!ext?.valueExpression?.expression) {
+            return undefined;
+        }
+
+        return {
+            expression: ext.valueExpression.expression,
+            language: ext.valueExpression.language
+        };
+    }
 
     ////////////////////////////////
     //          Actions           //
@@ -119,6 +159,11 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
      * @returns the mapped Field
      */
     function getFieldFromItem(item: QuestionnaireItem, fieldList: Field[]): Field[] {
+        const variableDefinitions = getVariableDefinitions(item.extension);
+        const calculatedExpression = getCalculatedExpression(item.extension);
+        console.log("Variable: " + JSON.stringify(variableDefinitions))
+        console.log("Expression: " + JSON.stringify(calculatedExpression))
+
         var field = {
             id: item.linkId,
             prefix: item.prefix,
@@ -129,7 +174,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             hidden: isHidden(item.extension),
             disabled: (form, questionId) => configs.readOnly || !getFieldEnabled(item)(form, questionId),
             hideOnDisabled: configs.readOnly ? false : (!item.disabledDisplay || item.disabledDisplay === "hidden"),
-            readOnly: item.readOnly ?? false,
+            readOnly: (item.readOnly ?? false) || !!calculatedExpression,
             required: item.required ?? false,
             repeat: item.repeats ?? false,
             maxLength: item.maxLength,
@@ -137,6 +182,8 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             subField: [],
             answerValueSet: item.answerValueSet,
             answerOption: item.answerOption,
+            variableDefinitions: variableDefinitions,
+            calculatedExpression: calculatedExpression,
         } as Field;
         fieldList.push(field);
         if (field.type !== 'group' && item.item && item.item.length > 0) {

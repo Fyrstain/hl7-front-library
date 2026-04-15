@@ -74,3 +74,15 @@ export const QuestionnaireROTSurPass: StoryObj<QuestionnaireProps> = {
         onError: () => { },
     },
 };
+
+export const QuestionnaireCHRU: StoryObj<QuestionnaireProps> = {
+    ...Template,
+    args: {
+        dataUrl:'https://janus.ovh.fyrstain.com/orchestrator',
+        sdcUrl:'https://janus.ovh.fyrstain.com/orchestrator',
+        terminologyUrl:'https://janus.ovh.fyrstain.com/orchestrator',
+        questionnaireUrl: "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
+        onSubmit: () => { },
+        onError: () => { },
+    },
+};
