@@ -284,13 +284,15 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                             return (answers[0].valueTime ?? '') as string;
                         } if (option.valueString) {
                             return (answers[0].valueString ?? '') as string;
+                        } if (option.valueReference) {
+                            return (answers[0].valueReference?.reference ?? '') as string;
                         }
-                        //TODO Reference
                     } else {
                         if (answers[0].valueCoding) {
                             return answers[0].valueCoding.system + '|' + answers[0].valueCoding.code;
+                        } else if (answers[0].valueReference) {
+                            return answers[0].valueReference.reference ?? '';
                         } else {
-                        //TODO Support reference options
                             var value = answers[0].valueInteger ?? answers[0].valueTime ?? answers[0].valueDate ?? answers[0].valueString;
                             return value as string;
                         }
@@ -678,12 +680,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                         else if (firstOption?.valueTime) item.answer = mapToTimeAnswer(value);
                         else if (firstOption?.valueString) item.answer = mapToStringAnswer(value);
                         else if (firstOption?.valueCoding) item.answer = mapToCodingAnswer(value);
-                        else if (firstOption?.valueReference)
-                            console.log(
-                                "Cannot convert answers for field [%s] of type [%s]",
-                                key,
-                                "reference (option)"
-                            );
+                        else if (firstOption?.valueReference) item.answer = mapToReferenceAnswer(value);
                         break;
                     }
                     item.answer = undefined;
@@ -715,6 +712,20 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 }
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v)
+        return answer.length > 0 ? answer : undefined;
+    }
+
+    function mapToReferenceAnswer(value: string[]): QuestionnaireResponseItemAnswer[] | undefined {
+        const answer = value.map(value => {
+            if (value === '') {
+                return undefined;
+            }
+            return {
+                valueReference: {
+                    reference: value
+                }
+            } as QuestionnaireResponseItemAnswer;
+        }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         return answer.length > 0 ? answer : undefined;
     }
 
