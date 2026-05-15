@@ -109,8 +109,9 @@ const SelectField: React.FC<FieldConfig> = (configs) => {
             return <option value={option.valueCoding.system + '|' + option.valueCoding.code} selected={option.initialSelected}>
                     {option.valueCoding.display ?? option.valueCoding.code}
                 </option>;
+        } else if (option.valueReference) {
+            return <option value={option.valueReference.reference}>{option.valueReference.display ?? option.valueReference.reference}</option>;
         } else {
-            //TODO Support reference options
             var value = option.valueInteger ?? option.valueTime ?? option.valueDate ?? option.valueString;
             return <option value={value}>{value}</option>;
         }

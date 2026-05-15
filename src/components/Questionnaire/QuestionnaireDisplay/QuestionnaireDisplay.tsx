@@ -8,6 +8,8 @@ import Title from '../../Title/Title';
 import { Extension, Questionnaire, QuestionnaireItem, QuestionnaireItemEnableWhen, QuestionnaireResponse, QuestionnaireResponseItem, QuestionnaireResponseItemAnswer } from 'fhir/r5';
 import { Field, FieldRenderer } from './Fields';
 import { ValueSetLoader } from '../../../services';
+import { VariableDefinition, CalculatedExpressionDefinition } from './Fields/FieldConfig'
+import { evaluateFhirPath } from './QuestionnaireService';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireDisplayProps {
@@ -41,6 +43,9 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-widthPercentage': 'width',
     };
 
+    const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
+    const CALCULATED_EXPRESSION_URL = 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression';
+
     ////////////////////////////////
     //           State            //
     ////////////////////////////////
@@ -49,6 +54,42 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [fields, setFields] = useState<Field[]>([]);
     const [form, setForm] = useState<{ [key: string]: string[] }>({});
     const [validated, setValidated] = useState(false);
+
+    function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
+        if (!extensions) {
+            return [];
+        }
+
+        return extensions
+            .filter(ext => ext.url === VARIABLE_EXTENSION_URL && ext.valueExpression)
+            .map(ext => ({
+                name: ext.valueExpression?.name ?? '',
+                expression: ext.valueExpression?.expression ?? '',
+                language: ext.valueExpression?.language
+            }))
+            .filter(v => v.name !== '' && v.expression !== '');
+    }
+
+    function getCalculatedExpression(extensions?: Extension[]): CalculatedExpressionDefinition | undefined {
+        if (!extensions) {
+            return undefined;
+        }
+
+        const ext = extensions.find(e =>
+            e.url === CALCULATED_EXPRESSION_URL &&
+            e.valueExpression &&
+            e.valueExpression.expression
+        );
+
+        if (!ext?.valueExpression?.expression) {
+            return undefined;
+        }
+
+        return {
+            expression: ext.valueExpression.expression,
+            language: ext.valueExpression.language
+        };
+    }
 
     ////////////////////////////////
     //          Actions           //
@@ -67,29 +108,45 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             ?.map(item => getFieldFromItem(item, []))
             .flat();
         setFields(fetchedFields ?? []);
-        setForm(
-            fetchedFields
-                ? buildFormFromQuestionnaireAndResponse(fetchedFields, configs.questionnaireResponse.item, {})
-                : {}
-        );
+
+        if (fetchedFields) {
+            setForm(buildFormWithExpressions(fetchedFields));
+        } else {
+            setForm({});
+        }
     }, [configs]);
 
-    /**
-     * Complete the form with all the fields retrieved from the Questionnaire.
-     * 
-     * @param fields the list of fields.
-     * @param form the form to complete.
-     * @returns the completed form.
-     */
-    function getFormFromFields(fields: Field[], form: { [key: string]: string[] }): { [key: string]: string[] } {
+    React.useEffect(() => {
+        
+    }, [form]);
+
+
+    function evaluateVariables(fields: Field[], questionnaireResponse: QuestionnaireResponse, variables: Map<string, any> ) {
         fields.forEach(field => {
-            var newValue = [field.initialValue];
-            form = { ...form, [field.id]: newValue };
-            if (field.subField) {
-                form = getFormFromFields(field.subField, form);
+            if (field.variableDefinitions) {
+                field.variableDefinitions.forEach(variable =>  {
+                    variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
+                })
             }
-        })
-        return form;
+            if (field.subField && field.subField.length > 0) {
+                evaluateVariables(field.subField, questionnaireResponse, variables);
+            }
+        })  
+    }
+
+    function calculateValue(fields: Field[], questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }, variables: Map<string, any> ) {
+        fields.forEach(field => {
+            if (field.calculatedExpression) {
+                var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
+                if (calculatedValue) {
+                    //⚠️ si groupe répétable, attention au préfix
+                    form[field.id] = Array.isArray(calculatedValue) ? calculatedValue : [calculatedValue];
+                }
+            }
+            if (field.subField && field.subField.length > 0) {
+                calculateValue(field.subField, questionnaireResponse, form, variables);
+            }
+        })  
     }
 
     /**
@@ -119,6 +176,9 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
      * @returns the mapped Field
      */
     function getFieldFromItem(item: QuestionnaireItem, fieldList: Field[]): Field[] {
+        const variableDefinitions = getVariableDefinitions(item.extension);
+        const calculatedExpression = getCalculatedExpression(item.extension);
+
         var field = {
             id: item.linkId,
             prefix: item.prefix,
@@ -129,7 +189,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             hidden: isHidden(item.extension),
             disabled: (form, questionId) => configs.readOnly || !getFieldEnabled(item)(form, questionId),
             hideOnDisabled: configs.readOnly ? false : (!item.disabledDisplay || item.disabledDisplay === "hidden"),
-            readOnly: item.readOnly ?? false,
+            readOnly: (item.readOnly ?? false) || !!calculatedExpression,
             required: item.required ?? false,
             repeat: item.repeats ?? false,
             maxLength: item.maxLength,
@@ -137,6 +197,8 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             subField: [],
             answerValueSet: item.answerValueSet,
             answerOption: item.answerOption,
+            variableDefinitions: variableDefinitions,
+            calculatedExpression: calculatedExpression,
         } as Field;
         fieldList.push(field);
         if (field.type !== 'group' && item.item && item.item.length > 0) {
@@ -222,8 +284,18 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                             return (answers[0].valueTime ?? '') as string;
                         } if (option.valueString) {
                             return (answers[0].valueString ?? '') as string;
+                        } if (option.valueReference) {
+                            return (answers[0].valueReference?.reference ?? '') as string;
                         }
-                        //TODO Reference
+                    } else {
+                        if (answers[0].valueCoding) {
+                            return answers[0].valueCoding.system + '|' + answers[0].valueCoding.code;
+                        } else if (answers[0].valueReference) {
+                            return answers[0].valueReference.reference ?? '';
+                        } else {
+                            var value = answers[0].valueInteger ?? answers[0].valueTime ?? answers[0].valueDate ?? answers[0].valueString;
+                            return value as string;
+                        }
                     }
                 case 'quantity':
                     return (answers[0].valueQuantity ? answers[0].valueQuantity.value + "|" + answers[0].valueQuantity.unit : '') as string;
@@ -451,7 +523,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     * Reset the form.
     */
     function onReset() {
-        setForm(buildFormFromQuestionnaireAndResponse(fields, configs.questionnaireResponse.item, {}));
+        setForm(buildFormWithExpressions(fields));
         setValidated(false);
     }
 
@@ -464,12 +536,16 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         event.preventDefault();
         const eventForm = event.currentTarget;
         if (eventForm.checkValidity() === true) {
-            var newQuestionnaireResponse = { ...configs.questionnaireResponse };
-            addAnswers(newQuestionnaireResponse, form);
-            configs.onSubmit(newQuestionnaireResponse);
+            configs.onSubmit(getQRFromForm(form));
         }
         setValidated(true);
     };
+
+    const getQRFromForm = (form: { [key: string]: string[] }) => {
+        var newQuestionnaireResponse = { ...configs.questionnaireResponse };
+        addAnswers(newQuestionnaireResponse, form);
+        return newQuestionnaireResponse;
+    }
 
     ////////////////////////////////
     //      Answer handling       //
@@ -604,12 +680,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                         else if (firstOption?.valueTime) item.answer = mapToTimeAnswer(value);
                         else if (firstOption?.valueString) item.answer = mapToStringAnswer(value);
                         else if (firstOption?.valueCoding) item.answer = mapToCodingAnswer(value);
-                        else if (firstOption?.valueReference)
-                            console.log(
-                                "Cannot convert answers for field [%s] of type [%s]",
-                                key,
-                                "reference (option)"
-                            );
+                        else if (firstOption?.valueReference) item.answer = mapToReferenceAnswer(value);
                         break;
                     }
                     item.answer = undefined;
@@ -641,6 +712,20 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 }
             } as QuestionnaireResponseItemAnswer;
         }).filter((v): v is QuestionnaireResponseItemAnswer => !!v)
+        return answer.length > 0 ? answer : undefined;
+    }
+
+    function mapToReferenceAnswer(value: string[]): QuestionnaireResponseItemAnswer[] | undefined {
+        const answer = value.map(value => {
+            if (value === '') {
+                return undefined;
+            }
+            return {
+                valueReference: {
+                    reference: value
+                }
+            } as QuestionnaireResponseItemAnswer;
+        }).filter((v): v is QuestionnaireResponseItemAnswer => !!v);
         return answer.length > 0 ? answer : undefined;
     }
 
@@ -842,49 +927,21 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         }).find(item => item !== undefined);
     }
 
-    function deepCloneWithoutAnswers(item: any) {
-        const cloned = JSON.parse(JSON.stringify(item));
-        const clear = (it: any) => {
-            delete it.answer;
-            if (Array.isArray(it.item)) it.item.forEach(clear);
-        };
-        clear(cloned);
-        return cloned;
-    }
+    function buildFormWithExpressions(
+        fields: Field[],
+    ): { [key: string]: string[] } {
+        //Form is ready with default values
+        var form = buildFormFromQuestionnaireAndResponse(fields, configs.questionnaireResponse.item, {});
+        
+        //Transform form -> QR
+        var currentQuestionnaireResponse = getQRFromForm(form);
 
-    function resolveItemByKeyPath(
-        key: string,
-        questionnaireResponseItems: QuestionnaireResponseItem[]
-    ): QuestionnaireResponseItem | undefined {
-        const parts = key.split("@@");
+        var variables: Map<string, any> = new Map<string,any>();
+        evaluateVariables(fields, currentQuestionnaireResponse, variables);
 
-        if (parts.length === 1) {
-            return getItemByLinkId(parts[0], questionnaireResponseItems);
-        }
+        calculateValue(fields, currentQuestionnaireResponse, form, variables);
 
-        let currentItems = questionnaireResponseItems;
-
-        for (let i = 0; i < parts.length - 1; i += 2) {
-            const groupId = parts[i];
-            const groupIndex = parseInt(parts[i + 1], 10);
-            if (Number.isNaN(groupIndex)) return undefined;
-
-            const [parentArray, groupItems] = getItemsByLinkId(groupId, currentItems);
-            if (!groupItems || groupItems.length === 0) return undefined;
-
-            while (groupItems.length <= groupIndex) {
-                const base = groupItems[0];
-                const cloned = deepCloneWithoutAnswers(base);
-                parentArray.push(cloned);
-                groupItems.push(cloned);
-            }
-
-            const instance = groupItems[groupIndex];
-            currentItems = instance.item ?? [];
-        }
-
-        const leafId = parts[parts.length - 1];
-        return currentItems.find(i => i.linkId === leafId);
+        return form;
     }
 
     function buildFormFromQuestionnaireAndResponse(
@@ -1011,7 +1068,16 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             />
             <Form noValidate validated={validated} onSubmit={handleSubmit} className='d-flex flex-column gap-4'>
                 <Form.Group>
-                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => setForm(massageFormForDisabledFields(fields, form)), configs.valueSetLoader))}
+                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => {
+                        var newForm = massageFormForDisabledFields(fields, form);
+                        //Transform form -> QR
+                        var currentQuestionnaireResponse = getQRFromForm(form);
+                        var variables: Map<string, any> = new Map<string,any>();
+                        evaluateVariables(fields, currentQuestionnaireResponse, variables);
+                        calculateValue(fields, currentQuestionnaireResponse, newForm, variables);
+
+                        setForm(newForm);
+                    }, configs.valueSetLoader))}
                 </Form.Group>
                 {!configs.readOnly &&
                     <Form.Group className="d-flex flex-wrap align-items-start gap-4">
