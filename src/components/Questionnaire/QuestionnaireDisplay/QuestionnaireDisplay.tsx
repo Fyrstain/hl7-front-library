@@ -44,8 +44,10 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     };
 
     const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
-    const CALCULATED_EXPRESSION_URL = 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression';
-
+    const CALCULATED_EXPRESSION_URLS = [
+        'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression',
+        'http://hl7.org/fhir/StructureDefinition/calculatedExpression',
+    ];
     ////////////////////////////////
     //           State            //
     ////////////////////////////////
@@ -76,7 +78,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         }
 
         const ext = extensions.find(e =>
-            e.url === CALCULATED_EXPRESSION_URL &&
+            CALCULATED_EXPRESSION_URLS.includes(e.url) &&
             e.valueExpression &&
             e.valueExpression.expression
         );
@@ -87,7 +89,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
 
         return {
             expression: ext.valueExpression.expression,
-            language: ext.valueExpression.language
+            language: ext.valueExpression.language ?? 'text/fhirpath'
         };
     }
 
