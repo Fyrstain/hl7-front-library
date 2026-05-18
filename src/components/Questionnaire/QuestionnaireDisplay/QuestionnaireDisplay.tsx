@@ -56,6 +56,24 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [fields, setFields] = useState<Field[]>([]);
     const [form, setForm] = useState<{ [key: string]: string[] }>({});
     const [validated, setValidated] = useState(false);
+    const [variables, setVariables] = useState<Map<string, any>>(new Map());
+
+    function evaluateExpression(
+        questionnaireResponse: QuestionnaireResponse,
+        expression: string,
+        variables: Map<string, any>
+        ): any {
+            try {
+                return evaluateFhirPath(questionnaireResponse, expression, variables);
+            } catch (error) {
+                console.warn('Erreur lors de l’évaluation FHIRPath', {
+                    expression,
+                    error
+                });
+
+                return null;
+            }
+    }
 
     function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
         if (!extensions) {
@@ -119,16 +137,36 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     }, [configs]);
 
     React.useEffect(() => {
-        
-    }, [form]);
+        if (!fields || fields.length === 0){
+            return;
+        }
+        const questionnaireResponse = getQRFromForm(form);
+        const nextVariables = new Map<string, any>();
+        evaluateVariables(fields, questionnaireResponse, nextVariables);
+
+        const nextForm = { ...form };
+        calculateValue(fields, questionnaireResponse, nextForm, nextVariables);
+
+        setVariables(nextVariables);
+
+        if (JSON.stringify(nextForm) !== JSON.stringify(form)) {
+            setForm(nextForm);
+        }
+    }, [form, fields]);
 
 
     function evaluateVariables(fields: Field[], questionnaireResponse: QuestionnaireResponse, variables: Map<string, any> ) {
         fields.forEach(field => {
             if (field.variableDefinitions) {
                 field.variableDefinitions.forEach(variable =>  {
-                    variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
-                })
+                    //variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
+                    const value = evaluateExpression(
+                        questionnaireResponse,
+                        variable.expression,
+                        variables
+                    );
+                    variables.set(variable.name, value);
+                });
             }
             if (field.subField && field.subField.length > 0) {
                 evaluateVariables(field.subField, questionnaireResponse, variables);
@@ -139,10 +177,18 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     function calculateValue(fields: Field[], questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }, variables: Map<string, any> ) {
         fields.forEach(field => {
             if (field.calculatedExpression) {
-                var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
-                if (calculatedValue) {
-                    //⚠️ si groupe répétable, attention au préfix
-                    form[field.id] = Array.isArray(calculatedValue) ? calculatedValue : [calculatedValue];
+               // var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
+               const calculatedValue = evaluateExpression(
+                questionnaireResponse,
+                field.calculatedExpression.expression,
+                variables
+               ); 
+               if (calculatedValue !== undefined && calculateValue !== null) {
+                    form[field.id] = Array.isArray(calculatedValue)
+                    ? calculatedValue.map(value => String(value))
+                    : [String(calculatedValue)]; 
+                } else {
+                    form[field.id] = [''];
                 }
             }
             if (field.subField && field.subField.length > 0) {
@@ -150,7 +196,6 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             }
         })  
     }
-
     /**
      * Complete the form with all the fields retrieved from the Questionnaire.
      * 
@@ -1070,10 +1115,10 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             />
             <Form noValidate validated={validated} onSubmit={handleSubmit} className='d-flex flex-column gap-4'>
                 <Form.Group>
-                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => {
-                        var newForm = massageFormForDisabledFields(fields, form);
+                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (updatedForm) => {
+                        var newForm = massageFormForDisabledFields(fields, updatedForm);
                         //Transform form -> QR
-                        var currentQuestionnaireResponse = getQRFromForm(form);
+                        var currentQuestionnaireResponse = getQRFromForm(updatedForm);
                         var variables: Map<string, any> = new Map<string,any>();
                         evaluateVariables(fields, currentQuestionnaireResponse, variables);
                         calculateValue(fields, currentQuestionnaireResponse, newForm, variables);
