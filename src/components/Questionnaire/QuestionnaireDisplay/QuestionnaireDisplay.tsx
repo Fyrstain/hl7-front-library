@@ -52,7 +52,6 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
     const CALCULATED_EXPRESSION_URLS = [
         'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression',
-        'http://hl7.org/fhir/StructureDefinition/calculatedExpression',
     ];
     ////////////////////////////////
     //           State            //
@@ -65,23 +64,23 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [variables, setVariables] = useState<Map<string, any>>(new Map());
 
     function evaluateCqlExpression(
-        expression: string,
-        questionnaireResponse: QuestionnaireResponse,
-        variables: Map<string, any>
-    ): any {
-        if (!configs.cqlEvaluator) {
-        console.warn('Évaluation CQL demandée mais moteur CQL non encore branché', {
-            expression,
-        });
+            expression: string,
+            questionnaireResponse: QuestionnaireResponse,
+            variables: Map<string, any>
+        ): any {
+            if (!configs.cqlEvaluator) {
+            console.warn('Évaluation CQL demandée mais moteur CQL non encore branché', {
+                expression,
+            });
 
-        return null;
-    }
-        return configs.cqlEvaluator(
-            expression,
-            questionnaireResponse,
-            variables
-        );
-    }
+            return null;
+        }
+            return configs.cqlEvaluator(
+                expression,
+                questionnaireResponse,
+                variables
+            );
+        }
 
     function evaluateExpression(
         questionnaireResponse: QuestionnaireResponse,
@@ -122,8 +121,8 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                 });
 
                 return null;
-            }
         }
+    }
 
     function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
         if (!extensions) {

@@ -100,12 +100,12 @@ const SelectField: React.FC<FieldConfig> = (configs) => {
         const value = `${code.system}|${code.code}`;
         const label = code.display ?? code.code;
 
-            return (
-                <option key={`${value}-${index}`} value={value}>
-                    {label}
-                </option>
-            );
-        }
+        return (
+            <option key={`${value}-${index}`} value={value}>
+                {label}
+            </option>
+        );
+    }
 
     /**
      * Transform QuestionnaireOptions into option to display in the form.
