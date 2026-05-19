@@ -10,6 +10,7 @@ import { Field, FieldRenderer } from './Fields';
 import { ValueSetLoader } from '../../../services';
 import { VariableDefinition, CalculatedExpressionDefinition } from './Fields/FieldConfig'
 import { evaluateFhirPath } from './QuestionnaireService';
+import { config } from '@fortawesome/fontawesome-svg-core';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireDisplayProps {
@@ -29,6 +30,11 @@ export interface QuestionnaireDisplayProps {
     valueSetLoader: ValueSetLoader;
     // Disable all the form fields and hide the buttons (default to false)
     readOnly?: boolean;
+    cqlEvaluator?: (
+        expression: string,
+        questionnaireResponse: QuestionnaireResponse,
+        variables: Map<string, any>
+    ) => any;
     // Function to call when an error occurs
     onError: () => void;
 }
@@ -58,22 +64,66 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [validated, setValidated] = useState(false);
     const [variables, setVariables] = useState<Map<string, any>>(new Map());
 
+    function evaluateCqlExpression(
+        expression: string,
+        questionnaireResponse: QuestionnaireResponse,
+        variables: Map<string, any>
+    ): any {
+        if (!configs.cqlEvaluator) {
+        console.warn('Évaluation CQL demandée mais moteur CQL non encore branché', {
+            expression,
+        });
+
+        return null;
+    }
+        return configs.cqlEvaluator(
+            expression,
+            questionnaireResponse,
+            variables
+        );
+    }
+
     function evaluateExpression(
         questionnaireResponse: QuestionnaireResponse,
         expression: string,
+        language: string | undefined,
         variables: Map<string, any>
         ): any {
-            try {
-                return evaluateFhirPath(questionnaireResponse, expression, variables);
+           try {
+                const expressionLanguage = language ?? 'text/fhirpath';
+
+                if (expressionLanguage === 'text/fhirpath') {
+                    return evaluateFhirPath(
+                        questionnaireResponse, 
+                        expression, 
+                        variables
+                    );
+                }
+
+                if (expressionLanguage === 'text/cql') {
+                    return evaluateCqlExpression(
+                        expression,
+                        questionnaireResponse,
+                        variables
+                    );
+                }
+
+                console.warn('Langage d’expression non supporté', {
+                    language: expressionLanguage,
+                    expression
+                });
+
+                return null;
             } catch (error) {
-                console.warn('Erreur lors de l’évaluation FHIRPath', {
+                console.warn('Erreur lors de l’évaluation de l’expression', {
+                    language,
                     expression,
                     error
                 });
 
                 return null;
             }
-    }
+        }
 
     function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
         if (!extensions) {
@@ -159,10 +209,10 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         fields.forEach(field => {
             if (field.variableDefinitions) {
                 field.variableDefinitions.forEach(variable =>  {
-                    //variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
                     const value = evaluateExpression(
                         questionnaireResponse,
                         variable.expression,
+                        variable.language,
                         variables
                     );
                     variables.set(variable.name, value);
@@ -174,28 +224,35 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         })  
     }
 
-    function calculateValue(fields: Field[], questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }, variables: Map<string, any> ) {
-        fields.forEach(field => {
-            if (field.calculatedExpression) {
-               // var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
-               const calculatedValue = evaluateExpression(
-                questionnaireResponse,
-                field.calculatedExpression.expression,
-                variables
-               ); 
-               if (calculatedValue !== undefined && calculateValue !== null) {
-                    form[field.id] = Array.isArray(calculatedValue)
-                    ? calculatedValue.map(value => String(value))
-                    : [String(calculatedValue)]; 
-                } else {
-                    form[field.id] = [''];
+    function calculateValue(
+            fields: Field[],
+            questionnaireResponse: QuestionnaireResponse,
+            form: { [key: string]: string[] },
+            variables: Map<string, any>
+        ) {
+            fields.forEach(field => {
+                if (field.calculatedExpression) {
+                    const calculatedValue = evaluateExpression(
+                        questionnaireResponse,
+                        field.calculatedExpression.expression,
+                        field.calculatedExpression.language,
+                        variables
+                    );
+
+                    if (calculatedValue !== undefined && calculatedValue !== null) {
+                        form[field.id] = Array.isArray(calculatedValue)
+                            ? calculatedValue.map(value => String(value))
+                            : [String(calculatedValue)];
+                    } else {
+                        form[field.id] = [''];
+                    }
                 }
-            }
-            if (field.subField && field.subField.length > 0) {
-                calculateValue(field.subField, questionnaireResponse, form, variables);
-            }
-        })  
-    }
+
+                if (field.subField && field.subField.length > 0) {
+                    calculateValue(field.subField, questionnaireResponse, form, variables);
+                }
+            });
+        }
     /**
      * Complete the form with all the fields retrieved from the Questionnaire.
      * 
