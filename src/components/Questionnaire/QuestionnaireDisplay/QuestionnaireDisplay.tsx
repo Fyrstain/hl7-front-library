@@ -10,6 +10,7 @@ import { Field, FieldRenderer } from './Fields';
 import { ValueSetLoader } from '../../../services';
 import { VariableDefinition, CalculatedExpressionDefinition } from './Fields/FieldConfig'
 import { evaluateFhirPath } from './QuestionnaireService';
+import { config } from '@fortawesome/fontawesome-svg-core';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireDisplayProps {
@@ -29,6 +30,11 @@ export interface QuestionnaireDisplayProps {
     valueSetLoader: ValueSetLoader;
     // Disable all the form fields and hide the buttons (default to false)
     readOnly?: boolean;
+    cqlEvaluator?: (
+        expression: string,
+        questionnaireResponse: QuestionnaireResponse,
+        variables: Map<string, any>
+    ) => any;
     // Function to call when an error occurs
     onError: () => void;
 }
@@ -44,8 +50,9 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     };
 
     const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
-    const CALCULATED_EXPRESSION_URL = 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression';
-
+    const CALCULATED_EXPRESSION_URLS = [
+        'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression',
+    ];
     ////////////////////////////////
     //           State            //
     ////////////////////////////////
@@ -54,6 +61,68 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [fields, setFields] = useState<Field[]>([]);
     const [form, setForm] = useState<{ [key: string]: string[] }>({});
     const [validated, setValidated] = useState(false);
+    const [variables, setVariables] = useState<Map<string, any>>(new Map());
+
+    function evaluateCqlExpression(
+            expression: string,
+            questionnaireResponse: QuestionnaireResponse,
+            variables: Map<string, any>
+        ): any {
+            if (!configs.cqlEvaluator) {
+            console.warn('Évaluation CQL demandée mais moteur CQL non encore branché', {
+                expression,
+            });
+
+            return null;
+        }
+            return configs.cqlEvaluator(
+                expression,
+                questionnaireResponse,
+                variables
+            );
+        }
+
+    function evaluateExpression(
+        questionnaireResponse: QuestionnaireResponse,
+        expression: string,
+        language: string | undefined,
+        variables: Map<string, any>
+        ): any {
+           try {
+                const expressionLanguage = language ?? 'text/fhirpath';
+
+                if (expressionLanguage === 'text/fhirpath') {
+                    return evaluateFhirPath(
+                        questionnaireResponse, 
+                        expression, 
+                        variables
+                    );
+                }
+
+                if (expressionLanguage === 'text/cql') {
+                    return evaluateCqlExpression(
+                        expression,
+                        questionnaireResponse,
+                        variables
+                    );
+                }
+
+                console.warn('Langage d’expression non supporté', {
+                    language: expressionLanguage,
+                    expression
+                });
+
+                return null;
+            } catch (error) {
+                console.warn('Erreur lors de l’évaluation de l’expression', {
+                    language,
+                    expression,
+                    error
+                });
+
+                return null;
+        }
+    }
 
     function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
         if (!extensions) {
@@ -76,7 +145,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         }
 
         const ext = extensions.find(e =>
-            e.url === CALCULATED_EXPRESSION_URL &&
+            CALCULATED_EXPRESSION_URLS.includes(e.url) &&
             e.valueExpression &&
             e.valueExpression.expression
         );
@@ -87,7 +156,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
 
         return {
             expression: ext.valueExpression.expression,
-            language: ext.valueExpression.language
+            language: ext.valueExpression.language ?? 'text/fhirpath'
         };
     }
 
@@ -117,16 +186,36 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     }, [configs]);
 
     React.useEffect(() => {
-        
-    }, [form]);
+        if (!fields || fields.length === 0){
+            return;
+        }
+        const questionnaireResponse = getQRFromForm(form);
+        const nextVariables = new Map<string, any>();
+        evaluateVariables(fields, questionnaireResponse, nextVariables);
+
+        const nextForm = { ...form };
+        calculateValue(fields, questionnaireResponse, nextForm, nextVariables);
+
+        setVariables(nextVariables);
+
+        if (JSON.stringify(nextForm) !== JSON.stringify(form)) {
+            setForm(nextForm);
+        }
+    }, [form, fields]);
 
 
     function evaluateVariables(fields: Field[], questionnaireResponse: QuestionnaireResponse, variables: Map<string, any> ) {
         fields.forEach(field => {
             if (field.variableDefinitions) {
                 field.variableDefinitions.forEach(variable =>  {
-                    variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
-                })
+                    const value = evaluateExpression(
+                        questionnaireResponse,
+                        variable.expression,
+                        variable.language,
+                        variables
+                    );
+                    variables.set(variable.name, value);
+                });
             }
             if (field.subField && field.subField.length > 0) {
                 evaluateVariables(field.subField, questionnaireResponse, variables);
@@ -134,21 +223,35 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         })  
     }
 
-    function calculateValue(fields: Field[], questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }, variables: Map<string, any> ) {
-        fields.forEach(field => {
-            if (field.calculatedExpression) {
-                var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
-                if (calculatedValue) {
-                    //⚠️ si groupe répétable, attention au préfix
-                    form[field.id] = Array.isArray(calculatedValue) ? calculatedValue : [calculatedValue];
-                }
-            }
-            if (field.subField && field.subField.length > 0) {
-                calculateValue(field.subField, questionnaireResponse, form, variables);
-            }
-        })  
-    }
+    function calculateValue(
+            fields: Field[],
+            questionnaireResponse: QuestionnaireResponse,
+            form: { [key: string]: string[] },
+            variables: Map<string, any>
+        ) {
+            fields.forEach(field => {
+                if (field.calculatedExpression) {
+                    const calculatedValue = evaluateExpression(
+                        questionnaireResponse,
+                        field.calculatedExpression.expression,
+                        field.calculatedExpression.language,
+                        variables
+                    );
 
+                    if (calculatedValue !== undefined && calculatedValue !== null) {
+                        form[field.id] = Array.isArray(calculatedValue)
+                            ? calculatedValue.map(value => String(value))
+                            : [String(calculatedValue)];
+                    } else {
+                        form[field.id] = [''];
+                    }
+                }
+
+                if (field.subField && field.subField.length > 0) {
+                    calculateValue(field.subField, questionnaireResponse, form, variables);
+                }
+            });
+        }
     /**
      * Complete the form with all the fields retrieved from the Questionnaire.
      * 
@@ -1068,10 +1171,10 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             />
             <Form noValidate validated={validated} onSubmit={handleSubmit} className='d-flex flex-column gap-4'>
                 <Form.Group>
-                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => {
-                        var newForm = massageFormForDisabledFields(fields, form);
+                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (updatedForm) => {
+                        var newForm = massageFormForDisabledFields(fields, updatedForm);
                         //Transform form -> QR
-                        var currentQuestionnaireResponse = getQRFromForm(form);
+                        var currentQuestionnaireResponse = getQRFromForm(updatedForm);
                         var variables: Map<string, any> = new Map<string,any>();
                         evaluateVariables(fields, currentQuestionnaireResponse, variables);
                         calculateValue(fields, currentQuestionnaireResponse, newForm, variables);

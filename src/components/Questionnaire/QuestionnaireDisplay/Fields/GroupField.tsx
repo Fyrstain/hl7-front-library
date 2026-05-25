@@ -79,7 +79,16 @@ const GroupField: React.FC<FieldConfig> = (configs) => {
                         <Title level={2} prefix={configs.field.prefix} content={configs.field.label} />
                     </Card.Header>
                     <Card.Body className="cardBody">
-                        {configs.field.subField.map(field => FieldRenderer.getFieldComponent(field, configs.form, configs.updateForm, configs.valueSetLoader))}
+                        {configs.field.subField.map((field, index) => (
+                            <React.Fragment key={`${field.id}-${index}`}>
+                                {FieldRenderer.getFieldComponent(
+                                    field,
+                                    configs.form,
+                                    configs.updateForm,
+                                    configs.valueSetLoader
+                                )}
+                            </React.Fragment>
+                        ))}
                     </Card.Body>
                 </Card>
             }
