@@ -1321,3 +1321,448 @@ export const WithCustomLabels: StoryObj<QuestionnaireDisplayProps> = {
         onError: () => console.error("Error"),
     },
 };
+const qrChru = {
+    "resourceType": "QuestionnaireResponse",
+    "id": "1044",
+    "meta": {
+        "versionId": "1",
+        "lastUpdated": "2026-06-02T07:48:01.619+00:00"
+    },
+    "contained": [ {
+        "resourceType": "Questionnaire",
+        "id": "Questionnaire-UpCare",
+        "language": "fr-FR",
+        "url": "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
+        "version": "0.1.0",
+        "name": "QuestionnaireUpCare",
+        "title": "CHRU Questionnaire de Satisfaction projet Up Care",
+        "status": "draft",
+        "subjectType": [ "Patient" ],
+        "date": "2026-05-13T16:20:30+02:00",
+        "publisher": "CHUN",
+        "contact": [ {
+        "name": "CHUN",
+        "telecom": [ {
+            "system": "url",
+            "value": "http://chun.upcare.fr"
+        } ]
+        } ],
+        "description": "Questionnaire de satisfaction du projet Up Care.",
+        "item": [ {
+        "linkId": "2344e4b2-f5eb-4f54-88fa-51686a47f261",
+        "text": "Ce questionnaire aborde diffÃÂ©rents aspects de votre vie il vous est demandÃÂ© dÃ¢ÂÂÃÂ©valuer votre satisfaction. Il se compose dÃ¢ÂÂune sÃÂ©rie dÃ¢ÂÂÃÂ©noncÃÂ©s pour lesquels vous devez indiquer votre position sur une ÃÂ©chelle de satisfaction composÃÂ©e de 6 modalitÃÂ©s ÃÂ« pas du tout satisfait ÃÂ» ÃÂ  ÃÂ« tout ÃÂ  fait satisfait ÃÂ»\nSoyez spontanÃÂ© et sincÃÂ¨re dans vos rÃÂ©ponses.\nCe questionnaire est anonyme, confidentiel et aucune rÃÂ©ponse individuelle ne sera communiquÃÂ©e.",
+        "type": "display"
+        }, {
+        "linkId": "05e5342c-4745-46e5-898b-9de7f6345085",
+        "text": "Informations gÃÂ©nÃÂ©rales",
+        "type": "group",
+        "required": true,
+        "item": [ {
+            "extension": [ {
+            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+            "valueCodeableConcept": {
+                "coding": [ {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "radio-button"
+                } ]
+            }
+            } ],
+            "linkId": "aee11f5c-d4fa-4e78-8fe7-9a23ef692434",
+            "text": "Vous ÃÂªtes",
+            "type": "choice",
+            "required": true,
+            "answerOption": [ {
+            "valueString": "Une femme"
+            }, {
+            "valueString": "Un homme"
+            } ]
+        }, {
+            "extension": [ {
+            "url": "http://hl7.org/fhir/StructureDefinition/minValue",
+            "valueInteger": 0
+            }, {
+            "url": "http://hl7.org/fhir/StructureDefinition/maxValue",
+            "valueInteger": 120
+            } ],
+            "linkId": "87d0898a-eb83-43bc-83e0-3705536413b2",
+            "text": "Votre ÃÂ¢ge",
+            "type": "integer",
+            "required": true
+        }, {
+            "linkId": "7b1d0342-56d9-4011-ac62-e9466bb0e872",
+            "text": "Votre date d'arrivÃÂ©e dans le service",
+            "type": "date",
+            "required": true
+        }, {
+            "extension": [ {
+            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+            "valueCodeableConcept": {
+                "coding": [ {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "drop-down"
+                } ]
+            }
+            } ],
+            "linkId": "c4a48ada-a01a-4d39-a067-ea3e99d5035c",
+            "text": "Votre fonction",
+            "type": "choice",
+            "required": true,
+            "answerOption": [ {
+            "valueString": "ASH"
+            }, {
+            "valueString": "AS"
+            }, {
+            "valueString": "IDE"
+            } ]
+        }, {
+            "extension": [ {
+            "url": "http://hl7.org/fhir/StructureDefinition/questionnaire-itemControl",
+            "valueCodeableConcept": {
+                "coding": [ {
+                "system": "http://hl7.org/fhir/questionnaire-item-control",
+                "code": "drop-down"
+                } ]
+            }
+            } ],
+            "linkId": "12093d97-a28d-452b-8fd3-6d6bf4527cfe",
+            "text": "Votre service",
+            "type": "choice",
+            "required": true,
+            "answerOption": [ {
+            "valueReference": {
+                "reference": "Organization/UCA-CENTRAL",
+                "display": "UCA CENTRAL"
+            }
+            }, {
+            "valueReference": {
+                "reference": "Organization/UCA-MATERNITE",
+                "display": "UCA MATERNITE"
+            }
+            } ]
+        } ]
+        }, {
+        "linkId": "de1f4934-cc25-4fd3-9e92-15057c488379",
+        "text": "Questionnaire",
+        "type": "group",
+        "required": true,
+        "item": [ {
+            "linkId": "429b294f-66f8-4d5a-d42d-b9955d1d9b66",
+            "text": "A. Organisation et contenu du travail",
+            "type": "group",
+            "required": true,
+            "item": [ {
+            "extension": [ {
+                "url": "http://hl7.org/fhir/StructureDefinition/variable",
+                "valueExpression": {
+                "name": "qA",
+                "language": "text/fhirpath",
+                "expression": "%resource.repeat(item).where(linkId='59a247f8-578f-4c31-8f7c-8d08b0b552fb').answer.valueCoding.code"
+                }
+            } ],
+            "linkId": "59a247f8-578f-4c31-8f7c-8d08b0b552fb",
+            "text": "La maniÃÂ¨re dont le travail est organisÃÂ© dans mon service",
+            "type": "choice",
+            "required": true,
+            "answerOption": [ {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "0",
+                "display": "Pas du tout satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "1",
+                "display": "Pas satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "2",
+                "display": "Assez peu satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "3",
+                "display": "Assez satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "4",
+                "display": "Satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "5",
+                "display": "Tout ÃÂ  fait satisfait"
+                }
+            } ]
+            } ]
+        }, {
+            "linkId": "75c01161-9998-4212-82d0-58889ad89829",
+            "text": "B. Relation entre personnel",
+            "type": "group",
+            "required": true,
+            "item": [ {
+            "extension": [ {
+                "url": "http://hl7.org/fhir/StructureDefinition/variable",
+                "valueExpression": {
+                "name": "qB",
+                "language": "text/fhirpath",
+                "expression": "%resource.repeat(item).where(linkId='bfdc7394-7de1-4052-8652-de260795dc46').answer.valueCoding.code"
+                }
+            } ],
+            "linkId": "bfdc7394-7de1-4052-8652-de260795dc46",
+            "text": "Les relations humaines entre professionnels dans le service",
+            "type": "choice",
+            "required": true,
+            "answerOption": [ {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "0",
+                "display": "Pas du tout satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "1",
+                "display": "Pas satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "2",
+                "display": "Assez peu satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "3",
+                "display": "Assez satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "4",
+                "display": "Satisfait"
+                }
+            }, {
+                "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "5",
+                "display": "Tout ÃÂ  fait satisfait"
+                }
+            } ]
+            } ]
+        } ]
+        }, {
+        "extension": [ {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [ {
+            "url": "definition",
+            "valueUri": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.effective"
+            }, {
+            "url": "expression",
+            "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "(%resource.authored | %resource.meta.lastUpdated | now()).first()"
+            }
+            } ]
+        }, {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-definitionExtractValue",
+            "extension": [ {
+            "url": "definition",
+            "valueUri": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.focus"
+            }, {
+            "url": "expression",
+            "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "%resource.repeat(item).where(linkId='12093d97-a28d-452b-8fd3-6d6bf4527cfe').answer.value"
+            }
+            } ]
+        } ],
+        "linkId": "resultats-observation",
+        "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation",
+        "text": "RÃÂ©sultats calculÃÂ©s",
+        "type": "group",
+        "readOnly": true,
+        "item": [ {
+            "extension": [ {
+            "url": "http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression",
+            "valueExpression": {
+                "language": "text/fhirpath",
+                "expression": "(%qA.first().toDecimal() | %qB.first().toDecimal()).avg()"
+            }
+            } ],
+            "linkId": "score_moyen",
+            "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.valueQuantity.value",
+            "code": [ {
+            "system": "http://chun.upcare.fr/fhir/CodeSystem/upcare-observation-cs",
+            "code": "score-moyen-satisfaction",
+            "display": "Score moyen de satisfaction"
+            } ],
+            "text": "Score moyen de satisfaction",
+            "type": "decimal",
+            "readOnly": true
+        }, {
+            "linkId": "obs_status",
+            "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.status",
+            "text": "Statut de l'observation",
+            "type": "choice",
+            "readOnly": true,
+            "answerOption": [ {
+            "valueCoding": {
+                "system": "http://hl7.org/fhir/observation-status",
+                "code": "final",
+                "display": "Final"
+            },
+            "initialSelected": true
+            } ]
+        }, {
+            "linkId": "obs_code",
+            "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.code",
+            "text": "Code de l'observation",
+            "type": "choice",
+            "readOnly": true,
+            "answerOption": [ {
+            "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/upcare-observation-cs",
+                "code": "score-moyen-satisfaction",
+                "display": "Score moyen de satisfaction"
+            },
+            "initialSelected": true
+            } ]
+        } ]
+        } ]
+    } ],
+    "questionnaire": "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare|0.1.0",
+    "status": "in-progress",
+    "subject": {
+        "reference": "Patient/4616862c"
+    },
+    "authored": "2026-06-02T07:47:37+00:00",
+    "author": {
+        "identifier": {
+        "value": "john.doe@gmail.com"
+        }
+    },
+    "item": [ {
+        "linkId": "2344e4b2-f5eb-4f54-88fa-51686a47f261",
+        "text": "Ce questionnaire aborde diffÃÂ©rents aspects de votre vie il vous est demandÃÂ© dÃ¢ÂÂÃÂ©valuer votre satisfaction. Il se compose dÃ¢ÂÂune sÃÂ©rie dÃ¢ÂÂÃÂ©noncÃÂ©s pour lesquels vous devez indiquer votre position sur une ÃÂ©chelle de satisfaction composÃÂ©e de 6 modalitÃÂ©s ÃÂ« pas du tout satisfait ÃÂ» ÃÂ  ÃÂ« tout ÃÂ  fait satisfait ÃÂ»\nSoyez spontanÃÂ© et sincÃÂ¨re dans vos rÃÂ©ponses.\nCe questionnaire est anonyme, confidentiel et aucune rÃÂ©ponse individuelle ne sera communiquÃÂ©e."
+    }, {
+        "linkId": "05e5342c-4745-46e5-898b-9de7f6345085",
+        "text": "Informations gÃÂ©nÃÂ©rales",
+        "item": [ {
+        "linkId": "aee11f5c-d4fa-4e78-8fe7-9a23ef692434",
+        "text": "Vous ÃÂªtes",
+        "answer": [ {
+            "valueString": "Une femme"
+        } ]
+        }, {
+        "linkId": "87d0898a-eb83-43bc-83e0-3705536413b2",
+        "text": "Votre ÃÂ¢ge",
+        "answer": [ {
+            "valueInteger": 26
+        } ]
+        }, {
+        "linkId": "7b1d0342-56d9-4011-ac62-e9466bb0e872",
+        "text": "Votre date d'arrivÃÂ©e dans le service",
+        "answer": [ {
+            "valueDate": "2000-02-20"
+        } ]
+        }, {
+        "linkId": "c4a48ada-a01a-4d39-a067-ea3e99d5035c",
+        "text": "Votre fonction",
+        "answer": [ {
+            "valueString": "ASH"
+        } ]
+        }, {
+        "linkId": "12093d97-a28d-452b-8fd3-6d6bf4527cfe",
+        "text": "Votre service",
+        "answer": [ {
+            "valueReference": {
+            "reference": "Organization/UCA-CENTRAL"
+            }
+        } ]
+        } ]
+    }, {
+        "linkId": "de1f4934-cc25-4fd3-9e92-15057c488379",
+        "text": "Questionnaire",
+        "item": [ {
+        "linkId": "429b294f-66f8-4d5a-d42d-b9955d1d9b66",
+        "text": "A. Organisation et contenu du travail",
+        "item": [ {
+            "linkId": "59a247f8-578f-4c31-8f7c-8d08b0b552fb",
+            "text": "La maniÃÂ¨re dont le travail est organisÃÂ© dans mon service",
+            "answer": [ {
+            "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "2"
+            }
+            } ]
+        } ]
+        }, {
+        "linkId": "75c01161-9998-4212-82d0-58889ad89829",
+        "text": "B. Relation entre personnel",
+        "item": [ {
+            "linkId": "bfdc7394-7de1-4052-8652-de260795dc46",
+            "text": "Les relations humaines entre professionnels dans le service",
+            "answer": [ {
+            "valueCoding": {
+                "system": "http://chun.upcare.fr/fhir/CodeSystem/score-satisfaction-cs",
+                "code": "2"
+            }
+            } ]
+        } ]
+        } ]
+    }, {
+        "linkId": "resultats-observation",
+        "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation",
+        "text": "RÃÂ©sultats calculÃÂ©s",
+        "item": [ {
+        "linkId": "score_moyen",
+        "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.valueQuantity.value",
+        "text": "Score moyen de satisfaction",
+        "answer": [ {
+            "valueDecimal": 2
+        } ]
+        }, {
+        "linkId": "obs_status",
+        "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.status",
+        "text": "Statut de l'observation",
+        "answer": [ {
+            "valueCoding": {
+            "system": "http://hl7.org/fhir/observation-status",
+            "code": "final"
+            }
+        } ]
+        }, {
+        "linkId": "obs_code",
+        "definition": "http://hl7.org/fhir/StructureDefinition/Observation#Observation.code",
+        "text": "Code de l'observation",
+        "answer": [ {
+            "valueCoding": {
+            "system": "http://chun.upcare.fr/fhir/CodeSystem/upcare-observation-cs",
+            "code": "score-moyen-satisfaction"
+            }
+        } ]
+        } ]
+    } ]
+ } as any;
+
+const questionnaireChru = qrChru.contained?.[0];
+
+export const QuestionnaireCHRU: StoryObj<QuestionnaireDisplayProps> = {
+  ...Template,
+  args: {
+    questionnaire: questionnaireChru,
+    questionnaireResponse: qrChru,
+    valueSetLoader: valueSetLoaderMock,
+    onSubmit: (response) =>
+      console.log("Submitted CHRU response:", JSON.stringify(response, null, 2)),
+    onError: () => console.error("Error CHRU"),
+  },
+};

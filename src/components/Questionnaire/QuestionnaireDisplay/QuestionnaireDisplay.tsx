@@ -1107,20 +1107,43 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         if (!answers || answers.length === 0) {
             if (type === "choice" && field.answerOption?.length) {
                 const initialSelected = field.answerOption.find((o) => o.initialSelected);
+
                 if (initialSelected?.valueCoding) {
-                    return `${initialSelected.valueCoding.system}|${initialSelected.valueCoding.code}`;
+                return `${initialSelected.valueCoding.system}|${initialSelected.valueCoding.code}`;
+                }
+
+                if (initialSelected?.valueReference) {
+                return initialSelected.valueReference.reference ?? "";
+                }
+
+                if (initialSelected?.valueString) {
+                return initialSelected.valueString;
                 }
             }
+
             return field.initialValue ?? "";
         }
 
         switch (type) {
             case "choice":
             case "coding":
-                return answers[0].valueCoding
-                    ? `${answers[0].valueCoding.system}|${answers[0].valueCoding.code}`
-                    : "";
+                {
+                    const answer = answers[0];
 
+                    if (answer.valueCoding) {
+                        return `${answer.valueCoding.system}|${answer.valueCoding.code}`;
+                    }
+
+                    if (answer.valueReference) {
+                        return answer.valueReference.reference ?? "";
+                    }
+
+                    if (answer.valueString) {
+                        return answer.valueString;
+                    }
+
+                    return "";
+                }
             case "quantity":
                 return answers[0].valueQuantity
                     ? `${answers[0].valueQuantity.value}|${answers[0].valueQuantity.unit}`
