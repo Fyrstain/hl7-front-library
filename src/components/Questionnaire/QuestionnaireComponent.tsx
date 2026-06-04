@@ -6,6 +6,7 @@ import { Bundle, Questionnaire, QuestionnaireResponse } from 'fhir/r5';
 // Components
 import QuestionnaireDisplay from './QuestionnaireDisplay';
 import { ValueSetLoader } from '../../services';
+import ContextSelectionModal from './ContextSelectionModal';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireProps {
@@ -25,6 +26,13 @@ export interface QuestionnaireProps {
     questionnaireUrl: string;
     // Disable all the form field and hide the buttons (default to false)
     readOnly?: boolean;
+    contextSelection?: {
+        enabled: boolean;
+        resourceType: string;
+        parameterName: string;
+        title?: string;
+        displayMode?: "modal" | "dropdown";
+    };
     // Function to call when you submit the form
     onSubmit: (questionnaireResponse: QuestionnaireResponse, bundle: Bundle) => void;
     // Function to call when an error occurs
@@ -58,9 +66,43 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
     const [questionnaire, setQuestionnaire] = useState<Questionnaire>();
     const [questionnaireResponse, setQuestionnaireResponse] = useState<QuestionnaireResponse>();
 
+    const [showContextModal, setShowContextModal] = useState(false);
+    
     ////////////////////////////////
     //          Actions           //
     ////////////////////////////////
+
+    const populateQuestionnaire = async (
+    questionnaireToPopulate: Questionnaire,
+    contextReference?: string
+) => {
+    const parameters: any[] = [
+        {
+            name: "questionnaire",
+            resource: questionnaireToPopulate,
+        },
+    ];
+
+    if (contextReference) {
+        parameters.push({
+            name: configs.contextSelection?.parameterName ?? "subject",
+            valueReference: {
+                reference: contextReference,
+            },
+        });
+    }
+    const populateResponse = await sdcClient.operation({
+        name: "populate",
+        resourceType: "Questionnaire",
+        method: "POST",
+        input: {
+            resourceType: "Parameters",
+            parameter: parameters,
+        },
+    });
+
+    setQuestionnaireResponse(populateResponse as QuestionnaireResponse);
+};
 
     /**
     * Search on a Questionnaire resource with the search params.
@@ -74,23 +116,14 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                     resourceType: 'Questionnaire',
                     searchParams: { url: configs.questionnaireUrl },
                 });
-                setQuestionnaire(searchQuestionnaireResponse.entry[0].resource);
+                const foundQuestionnaire = searchQuestionnaireResponse.entry[0].resource as Questionnaire;
+                setQuestionnaire(foundQuestionnaire);
 
-                const populateResponse = await sdcClient.operation({
-                    name: "populate",
-                    resourceType: 'Questionnaire',
-                    method: "POST",
-                    input: {
-                        resourceType: "Parameters",
-                        parameter: [
-                            {
-                                name: "questionnaire",
-                                resource: searchQuestionnaireResponse.entry[0].resource
-                            }
-                        ]
-                    },
-                });
-                setQuestionnaireResponse(populateResponse as QuestionnaireResponse);
+                if (configs.contextSelection?.enabled) {
+                    setShowContextModal(true);
+                } else {
+                    await populateQuestionnaire(foundQuestionnaire);
+                }
             } catch (error) {
                 configs.onError();
             }
@@ -126,7 +159,25 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
     //          Content           //
     ////////////////////////////////
 
-    return (
+   return (
+    <React.Fragment>
+        {configs.contextSelection?.enabled && (
+            <ContextSelectionModal
+                show={showContextModal}
+                title={configs.contextSelection?.title}
+                serverUrl={configs.dataUrl}
+                resourceType={configs.contextSelection.resourceType}
+                onSelect={async (reference) => {
+                    setShowContextModal(false);
+                    if (questionnaire) {
+                        await populateQuestionnaire(questionnaire, reference);
+                    }
+                }}
+                onCancel={() => setShowContextModal(false)}
+                onError={configs.onError}
+            />
+        )}
+
         <QuestionnaireDisplay
             submitButtonLabel={configs.primaryButtonLabel}
             resetButtonLabel={configs.secondaryButtonLabel}
@@ -137,7 +188,8 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             onSubmit={(questionnaireResponse) => { extractAndSubmit(questionnaireResponse) }}
             onError={configs.onError}
         />
-    );
+    </React.Fragment>
+);
 };
 
 export default QuestionnaireComponent;

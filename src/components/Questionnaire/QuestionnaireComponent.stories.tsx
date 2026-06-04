@@ -82,6 +82,13 @@ export const QuestionnaireCHRU: StoryObj<QuestionnaireProps> = {
         sdcUrl:'https://janus.ovh.fyrstain.com/orchestrator',
         terminologyUrl:'https://janus.ovh.fyrstain.com/orchestrator',
         questionnaireUrl: "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
+        contextSelection: {
+            enabled: true,
+            resourceType: "Organization",
+            parameterName: "organization",
+            title: "Sélectionner un service",
+            displayMode: "modal",
+        },
         onSubmit: () => { },
         onError: () => { },
     },

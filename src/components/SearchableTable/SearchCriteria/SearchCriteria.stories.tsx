@@ -53,7 +53,7 @@ export const searchSection: StoryObj<SearchCriteriaProperties> = {
             {
                 label: "Patient",
                 type: "select",
-                placeholder: "-- Please choose a patient --",
+                placeholder: "-- Please choose a service --",
                 options: [
                     {
                         value: "Dupont",
