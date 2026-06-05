@@ -84,8 +84,6 @@ export const QuestionnaireCHRU: StoryObj<QuestionnaireProps> = {
         questionnaireUrl: "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
         contextSelection: {
             enabled: true,
-            resourceType: "Organization",
-            parameterName: "organization",
             title: "Sélectionner un service",
             displayMode: "modal",
         },

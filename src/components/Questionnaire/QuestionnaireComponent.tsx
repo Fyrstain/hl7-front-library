@@ -28,11 +28,13 @@ export interface QuestionnaireProps {
     readOnly?: boolean;
     contextSelection?: {
         enabled: boolean;
-        resourceType: string;
-        parameterName: string;
         title?: string;
-        displayMode?: "modal" | "dropdown";
+        displayMode?: "modal";
+        searchMode?: "identifier";
+        resourceTypes?: string[];
     };
+    populateOnContextSelection?: boolean;
+    onContextSelected?: (reference: string) => void;
     // Function to call when you submit the form
     onSubmit: (questionnaireResponse: QuestionnaireResponse, bundle: Bundle) => void;
     // Function to call when an error occurs
@@ -67,7 +69,8 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
     const [questionnaireResponse, setQuestionnaireResponse] = useState<QuestionnaireResponse>();
 
     const [showContextModal, setShowContextModal] = useState(false);
-    
+    const [selectedContextReference, setSelectedContextReference] = useState<string>();
+
     ////////////////////////////////
     //          Actions           //
     ////////////////////////////////
@@ -85,10 +88,8 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
 
     if (contextReference) {
         parameters.push({
-            name: configs.contextSelection?.parameterName ?? "subject",
-            valueReference: {
-                reference: contextReference,
-            },
+            name: "subject",
+            valueString: contextReference,
         });
     }
     const populateResponse = await sdcClient.operation({
@@ -155,39 +156,53 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             .catch(configs.onError);
     }
 
+    const contextResourceTypes =
+        configs.contextSelection?.resourceTypes ??
+        questionnaire?.subjectType ??
+        [];
+
     ////////////////////////////////
     //          Content           //
     ////////////////////////////////
 
    return (
     <React.Fragment>
-        {configs.contextSelection?.enabled && (
+        {configs.contextSelection?.enabled && contextResourceTypes.length > 0 && (
             <ContextSelectionModal
                 show={showContextModal}
-                title={configs.contextSelection?.title}
+                title={configs.contextSelection?.title ?? "Sélectionner un contexte"}
                 serverUrl={configs.dataUrl}
-                resourceType={configs.contextSelection.resourceType}
+                resourceTypes={contextResourceTypes}
                 onSelect={async (reference) => {
+                    setSelectedContextReference(reference);
                     setShowContextModal(false);
-                    if (questionnaire) {
-                        await populateQuestionnaire(questionnaire, reference);
+                    configs.onContextSelected?.(reference);
+
+                    if (configs.populateOnContextSelection ?? true) {
+                        await populateQuestionnaire(questionnaire as Questionnaire, reference);
                     }
                 }}
                 onCancel={() => setShowContextModal(false)}
                 onError={configs.onError}
             />
         )}
-
+        {selectedContextReference && (
+            <div className="alert alert-info">
+                Contexte sélectionné : {selectedContextReference}
+            </div>
+        )}
+        {questionnaireResponse && (
         <QuestionnaireDisplay
             submitButtonLabel={configs.primaryButtonLabel}
             resetButtonLabel={configs.secondaryButtonLabel}
             questionnaire={questionnaire ?? {} as Questionnaire}
-            questionnaireResponse={questionnaireResponse ?? {} as QuestionnaireResponse}
+            questionnaireResponse={questionnaireResponse}
             valueSetLoader={valueSetLoader}
             readOnly={configs.readOnly ?? false}
             onSubmit={(questionnaireResponse) => { extractAndSubmit(questionnaireResponse) }}
             onError={configs.onError}
         />
+        )}
     </React.Fragment>
 );
 };

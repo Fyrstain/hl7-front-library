@@ -75,6 +75,10 @@ const SearchCriteria: React.FC<SearchCriteriaProperties> = (configs) => {
         let searchParams: { [key: string]: string } = { ...configs.fixedParameters };
 
         Object.entries(values).forEach(([key, value]) => {
+            if (key.startsWith("__")) {
+                return;
+            }
+
             if (value && value.length > 0) {
                 searchParams[key] = value;
             }
