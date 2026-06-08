@@ -8,10 +8,15 @@ export interface ContextSelectionModalProps {
     title?: string;
     serverUrl: string;
     resourceTypes: string[];
-    onSelect: (reference: string) => void;
+    onSelect: (reference: string, label: string) => void;
     onCancel: () => void;
     onError: () => void;
 }
+
+export type ContextResolution =
+    | { type: "none" }
+    | { type: "single"; reference: string; label: string }
+    | { type: "multiple" };
 
 const getDisplayLabel = (resourceType: string, resource: any): string => {
     switch (resourceType) {
@@ -27,7 +32,8 @@ const getDisplayLabel = (resourceType: string, resource: any): string => {
                             .filter(Boolean)
                             .join(" ")
                     )
-                    .join(", ")
+                    .filter(Boolean)
+                    .join(", ") || resource.id
                 : resource.id;
 
         case "Organization":
@@ -36,6 +42,49 @@ const getDisplayLabel = (resourceType: string, resource: any): string => {
         default:
             return resource.title ?? resource.name ?? resource.description ?? resource.id;
     }
+};
+
+export const resolveQuestionnaireContext = async (
+    fhirClient: any,
+    resourceTypes: string[],
+): Promise<ContextResolution> => {
+    const options: { reference: string; label: string }[] = [];
+
+    for (const resourceType of resourceTypes) {
+        const searchResponse = await fhirClient.search({
+            resourceType,
+            searchParams: { _count: 2 },
+        });
+
+        const entries = searchResponse.entry ?? [];
+
+        entries.slice(0, 2).forEach((entry: any) => {
+            const resource = entry.resource;
+
+            if (!resource?.id) {
+                return;
+            }
+
+            options.push({
+                reference: `${resourceType}/${resource.id}`,
+                label: getDisplayLabel(resourceType, resource),
+            });
+        });
+    }
+
+    if (options.length === 0) {
+        return { type: "none" };
+    }
+
+    if (options.length === 1) {
+        return {
+            type: "single",
+            reference: options[0].reference,
+            label: options[0].label,
+        };
+    }
+
+    return { type: "multiple" };
 };
 
 const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
@@ -55,12 +104,12 @@ const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
             </Modal.Header>
 
             <Modal.Body>
-                {props.resourceTypes.length > 1 && (
                     <div className="mb-3">
                         <label className="form-label">Type :</label>
                         <select
                             className="form-select"
                             value={selectedResourceType}
+                            disabled={props.resourceTypes.length === 1}
                             onChange={(event) => setSelectedResourceType(event.target.value)}
                         >
                             {props.resourceTypes.map((resourceType) => (
@@ -70,7 +119,6 @@ const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
                             ))}
                         </select>
                     </div>
-                )}
 
                 <SearchableTable
                     key={selectedResourceType}
@@ -111,8 +159,11 @@ const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
                         action: [
                             {
                                 icon: faCheck,
-                                onClick: (id: string) => {
-                                    props.onSelect(`${selectedResourceType}/${id}`);
+                                onClick: (id: string, event: any, item?: any) => {
+                                    props.onSelect(
+                                        `${selectedResourceType}/${id}`,
+                                        item?.label ?? id
+                                    );
                                 },
                             },
                         ],

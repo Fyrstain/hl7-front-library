@@ -7,6 +7,7 @@ import { Bundle, Questionnaire, QuestionnaireResponse } from 'fhir/r5';
 import QuestionnaireDisplay from './QuestionnaireDisplay';
 import { ValueSetLoader } from '../../services';
 import ContextSelectionModal from './ContextSelectionModal';
+import { resolveQuestionnaireContext } from './ContextSelectionModal/ContextSelectionModal';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireProps {
@@ -70,6 +71,7 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
 
     const [showContextModal, setShowContextModal] = useState(false);
     const [selectedContextReference, setSelectedContextReference] = useState<string>();
+    const [selectedContextLabel, setSelectedContextLabel] = useState<string>();
 
     ////////////////////////////////
     //          Actions           //
@@ -120,11 +122,32 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                 const foundQuestionnaire = searchQuestionnaireResponse.entry[0].resource as Questionnaire;
                 setQuestionnaire(foundQuestionnaire);
 
-                if (configs.contextSelection?.enabled) {
-                    setShowContextModal(true);
-                } else {
+                const resourceTypes =
+                    configs.contextSelection?.resourceTypes ??
+                    foundQuestionnaire.subjectType ??
+                    [];
+
+                if (!configs.contextSelection?.enabled || resourceTypes.length === 0) {
                     await populateQuestionnaire(foundQuestionnaire);
+                    return;
                 }
+
+                const contextResult = await resolveQuestionnaireContext(fhirClient, resourceTypes);
+
+                if (contextResult.type === "none") {
+                    await populateQuestionnaire(foundQuestionnaire);
+                    return;
+                }
+
+                if (contextResult.type === "single") {
+                    setSelectedContextReference(contextResult.reference);
+                    setSelectedContextLabel(contextResult.label);
+                    configs.onContextSelected?.(contextResult.reference);
+                    await populateQuestionnaire(foundQuestionnaire, contextResult.reference);
+                    return;
+                }
+                
+                setShowContextModal(true);
             } catch (error) {
                 configs.onError();
             }
@@ -173,8 +196,9 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                 title={configs.contextSelection?.title ?? "Sélectionner un contexte"}
                 serverUrl={configs.dataUrl}
                 resourceTypes={contextResourceTypes}
-                onSelect={async (reference) => {
+                onSelect={async (reference, label) => {
                     setSelectedContextReference(reference);
+                    setSelectedContextLabel(label);
                     setShowContextModal(false);
                     configs.onContextSelected?.(reference);
 
@@ -187,8 +211,13 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             />
         )}
         {selectedContextReference && (
-            <div className="alert alert-info">
-                Contexte sélectionné : {selectedContextReference}
+            <div className="mb-3">
+                <label className="form-label">Ressource sélectionnée</label>
+                <select className="form-select" value={selectedContextReference} disabled>
+                    <option value={selectedContextReference}>
+                        {selectedContextLabel ?? selectedContextReference}
+                    </option>
+                </select>
             </div>
         )}
         {questionnaireResponse && (
