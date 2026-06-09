@@ -55,7 +55,8 @@ export const getContextQuestionLinkIdsFromQuestionnaire = (
         if (
             item.answerOption?.some(
                 (answerOption: any) =>
-                    answerOption.valueReference?.reference === contextReference
+                    answerOption.valueReference?.reference?.split("/")?.[0] ===
+                    contextReference.split("/")?.[0]
             )
         ) {
             linkIds.add(item.linkId);
