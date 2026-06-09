@@ -7,7 +7,12 @@ import { Bundle, Questionnaire, QuestionnaireResponse } from 'fhir/r5';
 import QuestionnaireDisplay from './QuestionnaireDisplay';
 import { ValueSetLoader } from '../../services';
 import ContextSelectionModal from './ContextSelectionModal';
-import { resolveQuestionnaireContext } from './ContextSelectionModal/ContextSelectionModal';
+import {
+    resolveQuestionnaireContext,
+    getContextQuestionLinkIds,
+    removeContextQuestionFromQuestionnaire,
+    removeContextQuestionFromQuestionnaireResponse,
+} from './ContextSelectionModal/ContextSelectionModal';
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireProps {
@@ -79,7 +84,8 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
 
     const populateQuestionnaire = async (
     questionnaireToPopulate: Questionnaire,
-    contextReference?: string
+    contextReference?: string,
+    contextLabel?: string
 ) => {
     const parameters: any[] = [
         {
@@ -104,14 +110,39 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
         },
     });
 
-    setQuestionnaireResponse(populateResponse as QuestionnaireResponse);
-};
+        let populatedQuestionnaireResponse = populateResponse as QuestionnaireResponse;
+        let questionnaireToDisplay = questionnaireToPopulate;
 
-    /**
-    * Search on a Questionnaire resource with the search params.
-    *
-    * @param searchParams The search params
-    */
+        if (contextReference) {
+            populatedQuestionnaireResponse = {
+                ...populatedQuestionnaireResponse,
+                subject: {
+                    reference: contextReference,
+                    display: contextLabel ?? contextReference,
+                },
+            };
+
+            const contextQuestionLinkIds = getContextQuestionLinkIds(
+                questionnaireToPopulate,
+                populatedQuestionnaireResponse,
+                contextReference
+            );
+
+            questionnaireToDisplay = removeContextQuestionFromQuestionnaire(
+                questionnaireToPopulate,
+                contextQuestionLinkIds
+            );
+
+            populatedQuestionnaireResponse = removeContextQuestionFromQuestionnaireResponse(
+                populatedQuestionnaireResponse,
+                contextQuestionLinkIds
+            );
+        }
+
+        setQuestionnaire(questionnaireToDisplay);
+        setQuestionnaireResponse(populatedQuestionnaireResponse);
+    };
+
     React.useEffect(() => {
         const fetchQuestionnaire = async () => {
             try {
@@ -143,7 +174,12 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                     setSelectedContextReference(contextResult.reference);
                     setSelectedContextLabel(contextResult.label);
                     configs.onContextSelected?.(contextResult.reference);
-                    await populateQuestionnaire(foundQuestionnaire, contextResult.reference);
+
+                    await populateQuestionnaire(
+                        foundQuestionnaire,
+                        contextResult.reference,
+                        contextResult.label
+                    );
                     return;
                 }
                 
@@ -203,7 +239,7 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                     configs.onContextSelected?.(reference);
 
                     if (configs.populateOnContextSelection ?? true) {
-                        await populateQuestionnaire(questionnaire as Questionnaire, reference);
+                        await populateQuestionnaire(questionnaire as Questionnaire, reference, label);
                     }
                 }}
                 onCancel={() => setShowContextModal(false)}

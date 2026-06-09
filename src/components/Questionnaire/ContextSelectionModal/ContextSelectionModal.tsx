@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Modal } from "react-bootstrap";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
+import { Questionnaire, QuestionnaireResponse } from "fhir/r5";
 import SearchableTable from "../../SearchableTable";
 
 export interface ContextSelectionModalProps {
@@ -43,6 +44,114 @@ const getDisplayLabel = (resourceType: string, resource: any): string => {
             return resource.title ?? resource.name ?? resource.description ?? resource.id;
     }
 };
+
+export const getContextQuestionLinkIdsFromQuestionnaire = (
+    items: Questionnaire["item"] = [],
+    contextReference: string
+): Set<string> => {
+    const linkIds = new Set<string>();
+
+    items.forEach((item) => {
+        if (
+            item.answerOption?.some(
+                (answerOption: any) =>
+                    answerOption.valueReference?.reference === contextReference
+            )
+        ) {
+            linkIds.add(item.linkId);
+        }
+
+        getContextQuestionLinkIdsFromQuestionnaire(item.item, contextReference)
+            .forEach((linkId) => linkIds.add(linkId));
+    });
+
+    return linkIds;
+};
+
+export const getContextQuestionLinkIdsFromQuestionnaireResponse = (
+    items: QuestionnaireResponse["item"] = [],
+    contextReference: string
+): Set<string> => {
+    const linkIds = new Set<string>();
+
+    items.forEach((item) => {
+        if (
+            item.answer?.some(
+                (answer: any) =>
+                    answer.valueReference?.reference === contextReference
+            )
+        ) {
+            linkIds.add(item.linkId);
+        }
+
+        getContextQuestionLinkIdsFromQuestionnaireResponse(item.item, contextReference)
+            .forEach((linkId) => linkIds.add(linkId));
+    });
+
+    return linkIds;
+};
+
+export const removeItemsByLinkIdsFromQuestionnaire = (
+    items: Questionnaire["item"] = [],
+    linkIdsToRemove: Set<string>
+): Questionnaire["item"] => {
+    return items
+        .filter((item) => !linkIdsToRemove.has(item.linkId))
+        .map((item) => ({
+            ...item,
+            item: removeItemsByLinkIdsFromQuestionnaire(item.item, linkIdsToRemove),
+        }));
+};
+
+export const removeItemsByLinkIdsFromQuestionnaireResponse = (
+    items: QuestionnaireResponse["item"] = [],
+    linkIdsToRemove: Set<string>
+): QuestionnaireResponse["item"] => {
+    return items
+        .filter((item) => !linkIdsToRemove.has(item.linkId))
+        .map((item) => ({
+            ...item,
+            item: removeItemsByLinkIdsFromQuestionnaireResponse(item.item, linkIdsToRemove),
+        }));
+};
+
+export const getContextQuestionLinkIds = (
+    questionnaireToUse: Questionnaire,
+    responseToUse: QuestionnaireResponse,
+    contextReference: string
+): Set<string> => {
+    const linkIds = new Set<string>();
+
+    getContextQuestionLinkIdsFromQuestionnaire(questionnaireToUse.item, contextReference)
+        .forEach((linkId) => linkIds.add(linkId));
+
+    getContextQuestionLinkIdsFromQuestionnaireResponse(responseToUse.item, contextReference)
+        .forEach((linkId) => linkIds.add(linkId));
+
+    return linkIds;
+};
+
+export const removeContextQuestionFromQuestionnaire = (
+    questionnaireToFilter: Questionnaire,
+    linkIdsToRemove: Set<string>
+): Questionnaire => ({
+    ...questionnaireToFilter,
+    item: removeItemsByLinkIdsFromQuestionnaire(
+        questionnaireToFilter.item,
+        linkIdsToRemove
+    ),
+});
+
+export const removeContextQuestionFromQuestionnaireResponse = (
+    responseToFilter: QuestionnaireResponse,
+    linkIdsToRemove: Set<string>
+): QuestionnaireResponse => ({
+    ...responseToFilter,
+    item: removeItemsByLinkIdsFromQuestionnaireResponse(
+        responseToFilter.item,
+        linkIdsToRemove
+    ),
+});
 
 export const resolveQuestionnaireContext = async (
     fhirClient: any,
