@@ -75,40 +75,39 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
     const [questionnaireResponse, setQuestionnaireResponse] = useState<QuestionnaireResponse>();
 
     const [showContextModal, setShowContextModal] = useState(false);
-    const [selectedContextReference, setSelectedContextReference] = useState<string>();
-    const [selectedContextLabel, setSelectedContextLabel] = useState<string>();
+    const [selectedContexts, setSelectedContexts] = useState<{ reference: string; label: string }[]>([]);
 
     ////////////////////////////////
     //          Actions           //
     ////////////////////////////////
 
     const populateQuestionnaire = async (
-    questionnaireToPopulate: Questionnaire,
-    contextReference?: string,
-    contextLabel?: string
-) => {
-    const parameters: any[] = [
-        {
-            name: "questionnaire",
-            resource: questionnaireToPopulate,
-        },
-    ];
+        questionnaireToPopulate: Questionnaire,
+        contextReference?: string,
+        contextLabel?: string
+    ) => {
+        const parameters: any[] = [
+            {
+                name: "questionnaire",
+                resource: questionnaireToPopulate,
+            },
+        ];
 
-    if (contextReference) {
-        parameters.push({
-            name: "subject",
-            valueString: contextReference,
+        if (contextReference) {
+            parameters.push({
+                name: "subject",
+                valueString: contextReference,
+            });
+        }
+        const populateResponse = await sdcClient.operation({
+            name: "populate",
+            resourceType: "Questionnaire",
+            method: "POST",
+            input: {
+                resourceType: "Parameters",
+                parameter: parameters,
+            },
         });
-    }
-    const populateResponse = await sdcClient.operation({
-        name: "populate",
-        resourceType: "Questionnaire",
-        method: "POST",
-        input: {
-            resourceType: "Parameters",
-            parameter: parameters,
-        },
-    });
 
         let populatedQuestionnaireResponse = populateResponse as QuestionnaireResponse;
         let questionnaireToDisplay = questionnaireToPopulate;
@@ -171,10 +170,12 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                 }
 
                 if (contextResult.type === "single") {
-                    setSelectedContextReference(contextResult.reference);
-                    setSelectedContextLabel(contextResult.label);
-                    configs.onContextSelected?.(contextResult.reference);
-
+                    setSelectedContexts([
+                        {
+                            reference: contextResult.reference,
+                            label: contextResult.label,
+                        },
+                    ]);
                     await populateQuestionnaire(
                         foundQuestionnaire,
                         contextResult.reference,
@@ -233,8 +234,13 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                 serverUrl={configs.dataUrl}
                 resourceTypes={contextResourceTypes}
                 onSelect={async (reference, label) => {
-                    setSelectedContextReference(reference);
-                    setSelectedContextLabel(label);
+                    setSelectedContexts([
+                        {
+                            reference,
+                            label,
+                        },
+                    ]);
+
                     setShowContextModal(false);
                     configs.onContextSelected?.(reference);
 
@@ -246,13 +252,15 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                 onError={configs.onError}
             />
         )}
-        {selectedContextReference && (
+        {selectedContexts.length > 0 && (
             <div className="mb-3">
                 <label className="form-label">Ressource sélectionnée</label>
-                <select className="form-select" value={selectedContextReference} disabled>
-                    <option value={selectedContextReference}>
-                        {selectedContextLabel ?? selectedContextReference}
-                    </option>
+                <select className="form-select" disabled>
+                    {selectedContexts.map((context) => (
+                        <option key={context.reference} value={context.reference}>
+                            {context.label ?? context.reference}
+                        </option>
+                    ))}
                 </select>
             </div>
         )}

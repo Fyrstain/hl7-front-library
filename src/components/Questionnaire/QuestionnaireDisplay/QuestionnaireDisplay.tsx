@@ -11,6 +11,11 @@ import { ValueSetLoader } from '../../../services';
 import { VariableDefinition, CalculatedExpressionDefinition } from './Fields/FieldConfig'
 import { evaluateFhirPath } from './QuestionnaireService';
 import { config } from '@fortawesome/fontawesome-svg-core';
+import {
+    getContextQuestionLinkIds,
+    removeContextQuestionFromQuestionnaire,
+    removeContextQuestionFromQuestionnaireResponse,
+} from "../ContextSelectionModal/ContextSelectionModal";
 
 // Interface for the props of the Questionnaire component
 export interface QuestionnaireDisplayProps {
@@ -30,6 +35,7 @@ export interface QuestionnaireDisplayProps {
     valueSetLoader: ValueSetLoader;
     // Disable all the form fields and hide the buttons (default to false)
     readOnly?: boolean;
+    hideContextQuestion?: boolean;
     cqlEvaluator?: (
         expression: string,
         questionnaireResponse: QuestionnaireResponse,
@@ -63,6 +69,33 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [validated, setValidated] = useState(false);
     const [variables, setVariables] = useState<Map<string, any>>(new Map());
 
+    const contextReference = configs.questionnaireResponse?.subject?.reference;
+
+const contextQuestionLinkIds =
+    configs.hideContextQuestion && contextReference
+        ? getContextQuestionLinkIds(
+            configs.questionnaire,
+            configs.questionnaireResponse,
+            contextReference,
+        )
+        : new Set<string>();
+
+const questionnaireToDisplay =
+    configs.hideContextQuestion && contextQuestionLinkIds.size > 0
+        ? removeContextQuestionFromQuestionnaire(
+            configs.questionnaire,
+            contextQuestionLinkIds,
+        )
+        : configs.questionnaire;
+
+    const questionnaireResponseToDisplay =
+        configs.hideContextQuestion && contextQuestionLinkIds.size > 0
+            ? removeContextQuestionFromQuestionnaireResponse(
+                configs.questionnaireResponse,
+                contextQuestionLinkIds,
+            )
+            : configs.questionnaireResponse;
+        
     function evaluateCqlExpression(
             expression: string,
             questionnaireResponse: QuestionnaireResponse,
@@ -173,7 +206,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         //TODO What if no title ??
         setTitle(configs.questionnaire.title ?? "Questionnaire Title");
 
-        const fetchedFields = configs.questionnaire.item
+        const fetchedFields = questionnaireToDisplay.item
             ?.map(item => getFieldFromItem(item, []))
             .flat();
         setFields(fetchedFields ?? []);
@@ -183,7 +216,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         } else {
             setForm({});
         }
-    }, [configs]);
+    }, [questionnaireToDisplay, questionnaireResponseToDisplay]);
 
     React.useEffect(() => {
         if (!fields || fields.length === 0){
@@ -362,8 +395,8 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
 
         //TODO how do we handle repeating response ?
         var answers = [] as QuestionnaireResponseItemAnswer[];
-        if (configs.questionnaireResponse.item) {
-            const item = getItemByLinkId(id, configs.questionnaireResponse.item);
+        if (questionnaireResponseToDisplay.item) {
+            const item = getItemByLinkId(id, questionnaireResponseToDisplay.item);
             answers = item?.answer ?? [];
         }
         if (answers.length > 0) {
@@ -645,7 +678,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     };
 
     const getQRFromForm = (form: { [key: string]: string[] }) => {
-        var newQuestionnaireResponse = { ...configs.questionnaireResponse };
+        var newQuestionnaireResponse = { ...questionnaireResponseToDisplay };
         addAnswers(newQuestionnaireResponse, form);
         return newQuestionnaireResponse;
     }
@@ -1034,7 +1067,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         fields: Field[],
     ): { [key: string]: string[] } {
         //Form is ready with default values
-        var form = buildFormFromQuestionnaireAndResponse(fields, configs.questionnaireResponse.item, {});
+        var form = buildFormFromQuestionnaireAndResponse(fields, questionnaireResponseToDisplay.item, {});
         
         //Transform form -> QR
         var currentQuestionnaireResponse = getQRFromForm(form);

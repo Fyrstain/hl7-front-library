@@ -14,11 +14,18 @@ export interface ContextSelectionModalProps {
     onError: () => void;
 }
 
+/**
+ * The “multiple” case means that several candidate resources have been found and that the user
+ * must make a selection.
+ */
 export type ContextResolution =
     | { type: "none" }
     | { type: "single"; reference: string; label: string }
     | { type: "multiple" };
 
+/**
+ * Constructs readable label for displaying an FHIR resource.
+ */
 const getDisplayLabel = (resourceType: string, resource: any): string => {
     switch (resourceType) {
         case "Patient":
@@ -37,14 +44,14 @@ const getDisplayLabel = (resourceType: string, resource: any): string => {
                     .join(", ") || resource.id
                 : resource.id;
 
-        case "Organization":
-            return resource.name ?? resource.title ?? resource.description ?? resource.id;
-
         default:
             return resource.title ?? resource.name ?? resource.description ?? resource.id;
     }
 };
 
+/**
+ * Identifies the questions in the questionnaire that relate to the context resource.
+ */
 export const getContextQuestionLinkIdsFromQuestionnaire = (
     items: Questionnaire["item"] = [],
     contextReference: string
@@ -69,6 +76,9 @@ export const getContextQuestionLinkIdsFromQuestionnaire = (
     return linkIds;
 };
 
+/**
+ * Identifies, within the QuestionnaireResponse, the responses already linked to the context resource.
+ */
 export const getContextQuestionLinkIdsFromQuestionnaireResponse = (
     items: QuestionnaireResponse["item"] = [],
     contextReference: string
@@ -92,7 +102,10 @@ export const getContextQuestionLinkIdsFromQuestionnaireResponse = (
     return linkIds;
 };
 
-export const removeItemsByLinkIdsFromQuestionnaire = (
+/**
+ * Deletes the items with the specified linkId.
+ */
+const removeItemsByLinkIdsFromQuestionnaire = (
     items: Questionnaire["item"] = [],
     linkIdsToRemove: Set<string>
 ): Questionnaire["item"] => {
@@ -104,7 +117,10 @@ export const removeItemsByLinkIdsFromQuestionnaire = (
         }));
 };
 
-export const removeItemsByLinkIdsFromQuestionnaireResponse = (
+/**
+ * Deletes the items with the specified linkId.
+ */
+const removeItemsByLinkIdsFromQuestionnaireResponse = (
     items: QuestionnaireResponse["item"] = [],
     linkIdsToRemove: Set<string>
 ): QuestionnaireResponse["item"] => {
@@ -116,6 +132,10 @@ export const removeItemsByLinkIdsFromQuestionnaireResponse = (
         }));
 };
 
+/**
+ * Collects the linkIds of the context questions present in the Questionnaire
+ * or in the QuestionnaireResponse.
+ */
 export const getContextQuestionLinkIds = (
     questionnaireToUse: Questionnaire,
     responseToUse: QuestionnaireResponse,
@@ -132,6 +152,9 @@ export const getContextQuestionLinkIds = (
     return linkIds;
 };
 
+/**
+ * Returns a questionnaire without the context questions.
+ */
 export const removeContextQuestionFromQuestionnaire = (
     questionnaireToFilter: Questionnaire,
     linkIdsToRemove: Set<string>
@@ -143,6 +166,9 @@ export const removeContextQuestionFromQuestionnaire = (
     ),
 });
 
+/**
+ * Returns a questionnaireResponse without the context questions.
+ */
 export const removeContextQuestionFromQuestionnaireResponse = (
     responseToFilter: QuestionnaireResponse,
     linkIdsToRemove: Set<string>
@@ -154,6 +180,9 @@ export const removeContextQuestionFromQuestionnaireResponse = (
     ),
 });
 
+/**
+ * Searches for candidate resources to automatically resolve the context.
+ */
 export const resolveQuestionnaireContext = async (
     fhirClient: any,
     resourceTypes: string[],
@@ -163,6 +192,7 @@ export const resolveQuestionnaireContext = async (
     for (const resourceType of resourceTypes) {
         const searchResponse = await fhirClient.search({
             resourceType,
+            // Two results are enough to know whether the context is unique or not
             searchParams: { _count: 2 },
         });
 
