@@ -204,7 +204,7 @@ const questionnaireToDisplay =
     */
     React.useEffect(() => {
         //TODO What if no title ??
-        setTitle(configs.questionnaire.title ?? "Questionnaire Title");
+        setTitle(questionnaireToDisplay.title ?? "Questionnaire Title");
 
         const fetchedFields = questionnaireToDisplay.item
             ?.map(item => getFieldFromItem(item, []))
