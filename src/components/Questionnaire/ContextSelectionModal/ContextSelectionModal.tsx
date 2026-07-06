@@ -1,8 +1,14 @@
 import React, { useState } from "react";
 import { Modal } from "react-bootstrap";
 import { faCheck } from "@fortawesome/free-solid-svg-icons";
-import { Questionnaire, QuestionnaireResponse } from "fhir/r5";
 import SearchableTable from "../../SearchableTable";
+
+type ContextSearchInput = {
+    label: string;
+    placeholder?: string;
+    type: string;
+    searchParamsName: string;
+};
 
 export interface ContextSelectionModalProps {
     show: boolean;
@@ -22,6 +28,23 @@ export type ContextResolution =
     | { type: "none" }
     | { type: "single"; reference: string; label: string }
     | { type: "multiple" };
+
+const ID_SEARCH_INPUT: ContextSearchInput = {
+    label: "ID",
+    type: "text",
+    searchParamsName: "_id",
+};
+
+const NAME_SEARCH_INPUT: ContextSearchInput = {
+    label: "Name",
+    type: "text",
+    searchParamsName: "name",
+};
+
+const GENERIC_CONTEXT_SEARCH_INPUTS: ContextSearchInput[] = [
+    ID_SEARCH_INPUT,
+    NAME_SEARCH_INPUT,
+];
 
 /**
  * Constructs readable label for displaying an FHIR resource.
@@ -49,136 +72,10 @@ const getDisplayLabel = (resourceType: string, resource: any): string => {
     }
 };
 
-/**
- * Identifies the questions in the questionnaire that relate to the context resource.
- */
-export const getContextQuestionLinkIdsFromQuestionnaire = (
-    items: Questionnaire["item"] = [],
-    contextReference: string
-): Set<string> => {
-    const linkIds = new Set<string>();
-
-    items.forEach((item) => {
-        if (
-            item.answerOption?.some(
-                (answerOption: any) =>
-                    answerOption.valueReference?.reference?.split("/")?.[0] ===
-                    contextReference.split("/")?.[0]
-            )
-        ) {
-            linkIds.add(item.linkId);
-        }
-
-        getContextQuestionLinkIdsFromQuestionnaire(item.item, contextReference)
-            .forEach((linkId) => linkIds.add(linkId));
-    });
-
-    return linkIds;
-};
-
-/**
- * Identifies, within the QuestionnaireResponse, the responses already linked to the context resource.
- */
-export const getContextQuestionLinkIdsFromQuestionnaireResponse = (
-    items: QuestionnaireResponse["item"] = [],
-    contextReference: string
-): Set<string> => {
-    const linkIds = new Set<string>();
-
-    items.forEach((item) => {
-        if (
-            item.answer?.some(
-                (answer: any) =>
-                    answer.valueReference?.reference === contextReference
-            )
-        ) {
-            linkIds.add(item.linkId);
-        }
-
-        getContextQuestionLinkIdsFromQuestionnaireResponse(item.item, contextReference)
-            .forEach((linkId) => linkIds.add(linkId));
-    });
-
-    return linkIds;
-};
-
-/**
- * Deletes the items with the specified linkId.
- */
-const removeItemsByLinkIdsFromQuestionnaire = (
-    items: Questionnaire["item"] = [],
-    linkIdsToRemove: Set<string>
-): Questionnaire["item"] => {
-    return items
-        .filter((item) => !linkIdsToRemove.has(item.linkId))
-        .map((item) => ({
-            ...item,
-            item: removeItemsByLinkIdsFromQuestionnaire(item.item, linkIdsToRemove),
-        }));
-};
-
-/**
- * Deletes the items with the specified linkId.
- */
-const removeItemsByLinkIdsFromQuestionnaireResponse = (
-    items: QuestionnaireResponse["item"] = [],
-    linkIdsToRemove: Set<string>
-): QuestionnaireResponse["item"] => {
-    return items
-        .filter((item) => !linkIdsToRemove.has(item.linkId))
-        .map((item) => ({
-            ...item,
-            item: removeItemsByLinkIdsFromQuestionnaireResponse(item.item, linkIdsToRemove),
-        }));
-};
-
-/**
- * Collects the linkIds of the context questions present in the Questionnaire
- * or in the QuestionnaireResponse.
- */
-export const getContextQuestionLinkIds = (
-    questionnaireToUse: Questionnaire,
-    responseToUse: QuestionnaireResponse,
-    contextReference: string
-): Set<string> => {
-    const linkIds = new Set<string>();
-
-    getContextQuestionLinkIdsFromQuestionnaire(questionnaireToUse.item, contextReference)
-        .forEach((linkId) => linkIds.add(linkId));
-
-    getContextQuestionLinkIdsFromQuestionnaireResponse(responseToUse.item, contextReference)
-        .forEach((linkId) => linkIds.add(linkId));
-
-    return linkIds;
-};
-
-/**
- * Returns a questionnaire without the context questions.
- */
-export const removeContextQuestionFromQuestionnaire = (
-    questionnaireToFilter: Questionnaire,
-    linkIdsToRemove: Set<string>
-): Questionnaire => ({
-    ...questionnaireToFilter,
-    item: removeItemsByLinkIdsFromQuestionnaire(
-        questionnaireToFilter.item,
-        linkIdsToRemove
-    ),
-});
-
-/**
- * Returns a questionnaireResponse without the context questions.
- */
-export const removeContextQuestionFromQuestionnaireResponse = (
-    responseToFilter: QuestionnaireResponse,
-    linkIdsToRemove: Set<string>
-): QuestionnaireResponse => ({
-    ...responseToFilter,
-    item: removeItemsByLinkIdsFromQuestionnaireResponse(
-        responseToFilter.item,
-        linkIdsToRemove
-    ),
-});
+export const getContextSearchInputs = (
+    resourceType: string
+): ContextSearchInput[] =>
+    GENERIC_CONTEXT_SEARCH_INPUTS;
 
 /**
  * Searches for candidate resources to automatically resolve the context.
@@ -232,9 +129,6 @@ const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
         props.resourceTypes[0] ?? "Patient"
     );
 
-    const supportsNameSearch =
-        selectedResourceType === "Patient" || selectedResourceType === "Organization";
-
     return (
         <Modal show={props.show} onHide={props.onCancel} size="lg">
             <Modal.Header closeButton>
@@ -266,22 +160,7 @@ const ContextSelectionModal: React.FC<ContextSelectionModalProps> = (props) => {
                         title: "Recherche",
                         submitButtonLabel: "Rechercher",
                         resetButtonLabel: "Réinitialiser",
-                        inputs: [
-                            {
-                                label: "Identifiant",
-                                type: "text",
-                                searchParamsName: "_id",
-                            },
-                            ...(supportsNameSearch
-                                ? [
-                                    {
-                                        label: "Nom",
-                                        type: "text",
-                                        searchParamsName: "name",
-                                    },
-                                ]
-                                : []),
-                        ],
+                        inputs: getContextSearchInputs(selectedResourceType),
                     }}
                     paginatedTableProperties={{
                         columns: [

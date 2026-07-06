@@ -9,9 +9,6 @@ import { ValueSetLoader } from '../../services';
 import ContextSelectionModal from './ContextSelectionModal';
 import {
     resolveQuestionnaireContext,
-    getContextQuestionLinkIds,
-    removeContextQuestionFromQuestionnaire,
-    removeContextQuestionFromQuestionnaireResponse,
 } from './ContextSelectionModal/ContextSelectionModal';
 
 // Interface for the props of the Questionnaire component
@@ -46,6 +43,54 @@ export interface QuestionnaireProps {
     // Function to call when an error occurs
     onError: () => void;
 }
+
+const buildResourceSearchUrl = (
+    baseUrl: string,
+    resourceType: string,
+    searchParams: Record<string, string>
+): string => {
+    const normalizedBaseUrl = baseUrl.replace(/\/$/, '');
+    const query = new URLSearchParams(searchParams).toString();
+
+    return `${normalizedBaseUrl}/${resourceType}?${query}`;
+};
+
+const parseUtf8JsonResponse = async <T,>(response: Response): Promise<T> => {
+    const responseBody = await response.arrayBuffer();
+    const responseText = new TextDecoder('utf-8').decode(responseBody);
+
+    if (!response.ok) {
+        throw new Error(responseText || response.statusText);
+    }
+
+    return JSON.parse(responseText) as T;
+};
+
+const fetchQuestionnaireByUrlUtf8 = async (
+    baseUrl: string,
+    questionnaireUrl: string
+): Promise<Questionnaire> => {
+    const response = await fetch(
+        buildResourceSearchUrl(baseUrl, 'Questionnaire', {
+            url: questionnaireUrl,
+            _count: '1',
+        }),
+        {
+            headers: {
+                accept: 'application/fhir+json, application/json',
+            },
+        }
+    );
+
+    const searchResult = await parseUtf8JsonResponse<Bundle>(response);
+    const questionnaire = searchResult.entry?.[0]?.resource as Questionnaire | undefined;
+
+    if (!questionnaire) {
+        throw new Error(`Questionnaire not found for url "${questionnaireUrl}"`);
+    }
+
+    return questionnaire;
+};
 
 const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
 
@@ -110,8 +155,6 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
         });
 
         let populatedQuestionnaireResponse = populateResponse as QuestionnaireResponse;
-        let questionnaireToDisplay = questionnaireToPopulate;
-
         if (contextReference) {
             populatedQuestionnaireResponse = {
                 ...populatedQuestionnaireResponse,
@@ -120,36 +163,19 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
                     display: contextLabel ?? contextReference,
                 },
             };
-
-            const contextQuestionLinkIds = getContextQuestionLinkIds(
-                questionnaireToPopulate,
-                populatedQuestionnaireResponse,
-                contextReference
-            );
-
-            questionnaireToDisplay = removeContextQuestionFromQuestionnaire(
-                questionnaireToPopulate,
-                contextQuestionLinkIds
-            );
-
-            populatedQuestionnaireResponse = removeContextQuestionFromQuestionnaireResponse(
-                populatedQuestionnaireResponse,
-                contextQuestionLinkIds
-            );
         }
 
-        setQuestionnaire(questionnaireToDisplay);
+        setQuestionnaire(questionnaireToPopulate);
         setQuestionnaireResponse(populatedQuestionnaireResponse);
     };
 
     React.useEffect(() => {
         const fetchQuestionnaire = async () => {
             try {
-                const searchQuestionnaireResponse = await fhirClient.search({
-                    resourceType: 'Questionnaire',
-                    searchParams: { url: configs.questionnaireUrl },
-                });
-                const foundQuestionnaire = searchQuestionnaireResponse.entry[0].resource as Questionnaire;
+                const foundQuestionnaire = await fetchQuestionnaireByUrlUtf8(
+                    configs.dataUrl,
+                    configs.questionnaireUrl
+                );
                 setQuestionnaire(foundQuestionnaire);
 
                 const resourceTypes =
@@ -190,7 +216,7 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             }
         };
         fetchQuestionnaire();
-    }, [configs.questionnaireUrl, configs.onError, fhirClient]);
+    }, [configs.dataUrl, configs.questionnaireUrl, configs.onError, fhirClient]);
 
     function extractAndSubmit(questionnaireResponse: QuestionnaireResponse) {
         sdcClient.operation({
@@ -273,7 +299,6 @@ const QuestionnaireComponent: React.FC<QuestionnaireProps> = (configs) => {
             valueSetLoader={valueSetLoader}
             readOnly={configs.readOnly ?? false}
             onSubmit={(questionnaireResponse) => { extractAndSubmit(questionnaireResponse) }}
-            onError={configs.onError}
         />
         )}
     </React.Fragment>

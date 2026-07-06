@@ -228,9 +228,6 @@ export const CqlMock: Story = {
         onSubmit: ((questionnaireResponse) => {
             console.log('QuestionnaireResponse submit', questionnaireResponse);
         }) as QuestionnaireDisplayProps['onSubmit'],
-        onError: () => {
-            console.error('Erreur questionnaire');
-        },
         cqlEvaluator
     }
 };
