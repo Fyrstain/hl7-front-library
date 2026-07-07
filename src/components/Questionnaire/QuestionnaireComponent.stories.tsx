@@ -82,7 +82,35 @@ export const QuestionnaireCHRU: StoryObj<QuestionnaireProps> = {
         sdcUrl:'https://janus.ovh.fyrstain.com/orchestrator',
         terminologyUrl:'https://janus.ovh.fyrstain.com/orchestrator',
         questionnaireUrl: "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
+        contextSelection: {
+            enabled: true,
+            title: "Sélectionner un service",
+            displayMode: "modal",
+        },
         onSubmit: () => { },
         onError: () => { },
+    },
+};
+
+export const QuestionnaireHadSandboxPopulateUtf8: StoryObj<QuestionnaireProps> = {
+    ...Template,
+    args: {
+        dataUrl: 'https://had.sandbox.fyrstain.com/fhir',
+        sdcUrl: 'https://had.sandbox.fyrstain.com/fhir',
+        terminologyUrl: 'https://had.sandbox.fyrstain.com/fhir',
+        questionnaireUrl: "http://chun.upcare.fr/fhir/Questionnaire/Questionnaire-UpCare",
+        contextSelection: {
+            enabled: true,
+            title: "Select an organization",
+            displayMode: "modal",
+            resourceTypes: ["Organization"],
+        },
+        onSubmit: (questionnaireResponse, bundle) => {
+            console.log("Submitted response:", questionnaireResponse);
+            console.log("Extract bundle:", bundle);
+        },
+        onError: () => {
+            console.error("QuestionnaireHadSandboxPopulateUtf8 error");
+        },
     },
 };
