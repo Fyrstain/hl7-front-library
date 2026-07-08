@@ -29,8 +29,11 @@ export interface QuestionnaireDisplayProps {
     valueSetLoader: ValueSetLoader;
     // Disable all the form fields and hide the buttons (default to false)
     readOnly?: boolean;
-    // Function to call when an error occurs
-    onError: () => void;
+    cqlEvaluator?: (
+        expression: string,
+        questionnaireResponse: QuestionnaireResponse,
+        variables: Map<string, any>
+    ) => any;
 }
 
 const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
@@ -44,8 +47,9 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     };
 
     const VARIABLE_EXTENSION_URL = 'http://hl7.org/fhir/StructureDefinition/variable';
-    const CALCULATED_EXPRESSION_URL = 'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression';
-
+    const CALCULATED_EXPRESSION_URLS = [
+        'http://hl7.org/fhir/uv/sdc/StructureDefinition/sdc-questionnaire-calculatedExpression',
+    ];
     ////////////////////////////////
     //           State            //
     ////////////////////////////////
@@ -54,6 +58,67 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     const [fields, setFields] = useState<Field[]>([]);
     const [form, setForm] = useState<{ [key: string]: string[] }>({});
     const [validated, setValidated] = useState(false);
+        
+    function evaluateCqlExpression(
+            expression: string,
+            questionnaireResponse: QuestionnaireResponse,
+            variables: Map<string, any>
+        ): any {
+            if (!configs.cqlEvaluator) {
+            console.warn('Évaluation CQL demandée mais moteur CQL non encore branché', {
+                expression,
+            });
+
+            return null;
+        }
+            return configs.cqlEvaluator(
+                expression,
+                questionnaireResponse,
+                variables
+            );
+        }
+
+    function evaluateExpression(
+        questionnaireResponse: QuestionnaireResponse,
+        expression: string,
+        language: string | undefined,
+        variables: Map<string, any>
+        ): any {
+           try {
+                const expressionLanguage = language ?? 'text/fhirpath';
+
+                if (expressionLanguage === 'text/fhirpath') {
+                    return evaluateFhirPath(
+                        questionnaireResponse, 
+                        expression, 
+                        variables
+                    );
+                }
+
+                if (expressionLanguage === 'text/cql') {
+                    return evaluateCqlExpression(
+                        expression,
+                        questionnaireResponse,
+                        variables
+                    );
+                }
+
+                console.warn('Langage d’expression non supporté', {
+                    language: expressionLanguage,
+                    expression
+                });
+
+                return null;
+            } catch (error) {
+                console.warn('Erreur lors de l’évaluation de l’expression', {
+                    language,
+                    expression,
+                    error
+                });
+
+                return null;
+        }
+    }
 
     function getVariableDefinitions(extensions?: Extension[]): VariableDefinition[] {
         if (!extensions) {
@@ -76,7 +141,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         }
 
         const ext = extensions.find(e =>
-            e.url === CALCULATED_EXPRESSION_URL &&
+            CALCULATED_EXPRESSION_URLS.includes(e.url) &&
             e.valueExpression &&
             e.valueExpression.expression
         );
@@ -87,7 +152,7 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
 
         return {
             expression: ext.valueExpression.expression,
-            language: ext.valueExpression.language
+            language: ext.valueExpression.language ?? 'text/fhirpath'
         };
     }
 
@@ -114,19 +179,37 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         } else {
             setForm({});
         }
-    }, [configs]);
+    }, [configs.questionnaire, configs.questionnaireResponse]);
 
     React.useEffect(() => {
-        
-    }, [form]);
+        if (!fields || fields.length === 0){
+            return;
+        }
+        const questionnaireResponse = getQRFromForm(form);
+        const nextVariables = new Map<string, any>();
+        evaluateVariables(fields, questionnaireResponse, nextVariables);
+
+        const nextForm = { ...form };
+        calculateValue(fields, questionnaireResponse, nextForm, nextVariables);
+
+        if (JSON.stringify(nextForm) !== JSON.stringify(form)) {
+            setForm(nextForm);
+        }
+    }, [form, fields]);
 
 
     function evaluateVariables(fields: Field[], questionnaireResponse: QuestionnaireResponse, variables: Map<string, any> ) {
         fields.forEach(field => {
             if (field.variableDefinitions) {
                 field.variableDefinitions.forEach(variable =>  {
-                    variables.set(variable.name, evaluateFhirPath(questionnaireResponse, variable.expression, variables));
-                })
+                    const value = evaluateExpression(
+                        questionnaireResponse,
+                        variable.expression,
+                        variable.language,
+                        variables
+                    );
+                    variables.set(variable.name, value);
+                });
             }
             if (field.subField && field.subField.length > 0) {
                 evaluateVariables(field.subField, questionnaireResponse, variables);
@@ -134,21 +217,35 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         })  
     }
 
-    function calculateValue(fields: Field[], questionnaireResponse: QuestionnaireResponse, form: { [key: string]: string[] }, variables: Map<string, any> ) {
-        fields.forEach(field => {
-            if (field.calculatedExpression) {
-                var calculatedValue = evaluateFhirPath(questionnaireResponse, field.calculatedExpression.expression, variables);
-                if (calculatedValue) {
-                    //⚠️ si groupe répétable, attention au préfix
-                    form[field.id] = Array.isArray(calculatedValue) ? calculatedValue : [calculatedValue];
-                }
-            }
-            if (field.subField && field.subField.length > 0) {
-                calculateValue(field.subField, questionnaireResponse, form, variables);
-            }
-        })  
-    }
+    function calculateValue(
+            fields: Field[],
+            questionnaireResponse: QuestionnaireResponse,
+            form: { [key: string]: string[] },
+            variables: Map<string, any>
+        ) {
+            fields.forEach(field => {
+                if (field.calculatedExpression) {
+                    const calculatedValue = evaluateExpression(
+                        questionnaireResponse,
+                        field.calculatedExpression.expression,
+                        field.calculatedExpression.language,
+                        variables
+                    );
 
+                    if (calculatedValue !== undefined && calculatedValue !== null) {
+                        form[field.id] = Array.isArray(calculatedValue)
+                            ? calculatedValue.map(value => String(value))
+                            : [String(calculatedValue)];
+                    } else {
+                        form[field.id] = [''];
+                    }
+                }
+
+                if (field.subField && field.subField.length > 0) {
+                    calculateValue(field.subField, questionnaireResponse, form, variables);
+                }
+            });
+        }
     /**
      * Complete the form with all the fields retrieved from the Questionnaire.
      * 
@@ -542,8 +639,11 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
     };
 
     const getQRFromForm = (form: { [key: string]: string[] }) => {
-        var newQuestionnaireResponse = { ...configs.questionnaireResponse };
+        var newQuestionnaireResponse = JSON.parse(
+            JSON.stringify(configs.questionnaireResponse)
+        ) as QuestionnaireResponse;
         addAnswers(newQuestionnaireResponse, form);
+        pruneEmptyItemArrays(newQuestionnaireResponse);
         return newQuestionnaireResponse;
     }
 
@@ -564,6 +664,18 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             clear(cloned);
 
             return cloned;
+        };
+
+        const setItemAnswer = (
+            item: QuestionnaireResponseItem,
+            answer: QuestionnaireResponseItemAnswer[] | undefined
+        ) => {
+            if (answer && answer.length > 0) {
+                item.answer = answer;
+                return;
+            }
+
+            delete item.answer;
         };
 
         const resolveItemByKeyPath = (
@@ -630,64 +742,65 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             const originalFieldKey = key.includes("@@") ? key.split("@@").at(-1)! : key;
             const type = getFieldType(originalFieldKey, fields);
 
-            if (type === "group" || type === "display") continue;
+            if (!type || type === "group" || type === "display") continue;
+
+            delete item.answer;
 
             switch (type) {
                 case "date":
-                    item.answer = mapToDateAnswer(value);
+                    setItemAnswer(item, mapToDateAnswer(value));
                     break;
                 case "decimal":
-                    item.answer = mapToDecimalAnswer(value);
+                    setItemAnswer(item, mapToDecimalAnswer(value));
                     break;
                 case "integer":
-                    item.answer = mapToIntegerAnswer(value);
+                    setItemAnswer(item, mapToIntegerAnswer(value));
                     break;
                 case "url":
-                    item.answer = mapToUrlAnswer(value);
+                    setItemAnswer(item, mapToUrlAnswer(value));
                     break;
                 case "boolean":
-                    item.answer = mapToBooleanAnswer(value);
+                    setItemAnswer(item, mapToBooleanAnswer(value));
                     break;
                 case "text":
                 case "string":
-                    item.answer = mapToStringAnswer(value);
+                    setItemAnswer(item, mapToStringAnswer(value));
                     break;
                 case "coding":
-                    item.answer = mapToCodingAnswer(value);
+                    setItemAnswer(item, mapToCodingAnswer(value));
                     break;
                 case "dateTime":
-                    item.answer = mapToDateTimeAnswer(value);
+                    setItemAnswer(item, mapToDateTimeAnswer(value));
                     break;
                 case "time":
-                    item.answer = mapToTimeAnswer(value);
+                    setItemAnswer(item, mapToTimeAnswer(value));
                     break;
                 case "quantity":
-                    item.answer = mapToQuantityAnswer(value);
+                    setItemAnswer(item, mapToQuantityAnswer(value));
                     break;
                 case "choice": {
                     const field = getField(originalFieldKey, fields);
 
                     if (field?.answerValueSet) {
-                        item.answer = mapToCodingAnswer(value);
+                        setItemAnswer(item, mapToCodingAnswer(value));
                         break;
                     }
 
                     if (field && (field.answerOption?.length ?? 0) > 0) {
                         const firstOption = field.answerOption![0];
                         // It is implied that all options have the same type here
-                        if (firstOption?.valueInteger) item.answer = mapToIntegerAnswer(value);
-                        else if (firstOption?.valueDate) item.answer = mapToDateAnswer(value);
-                        else if (firstOption?.valueTime) item.answer = mapToTimeAnswer(value);
-                        else if (firstOption?.valueString) item.answer = mapToStringAnswer(value);
-                        else if (firstOption?.valueCoding) item.answer = mapToCodingAnswer(value);
-                        else if (firstOption?.valueReference) item.answer = mapToReferenceAnswer(value);
+                        if (firstOption?.valueInteger) setItemAnswer(item, mapToIntegerAnswer(value));
+                        else if (firstOption?.valueDate) setItemAnswer(item, mapToDateAnswer(value));
+                        else if (firstOption?.valueTime) setItemAnswer(item, mapToTimeAnswer(value));
+                        else if (firstOption?.valueString) setItemAnswer(item, mapToStringAnswer(value));
+                        else if (firstOption?.valueCoding) setItemAnswer(item, mapToCodingAnswer(value));
+                        else if (firstOption?.valueReference) setItemAnswer(item, mapToReferenceAnswer(value));
                         break;
                     }
-                    item.answer = undefined;
                     break;
                 }
                 case "attachment":
-                    item.answer = mapToAttachmentAnswer(value);
+                    setItemAnswer(item, mapToAttachmentAnswer(value));
                     break;
                 case "reference":
                 default:
@@ -696,6 +809,39 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
                     break;
             }
         }
+        return questionnaireResponse;
+    }
+
+    function pruneEmptyItemArrays(questionnaireResponse: QuestionnaireResponse): QuestionnaireResponse {
+        const pruneItems = (items: QuestionnaireResponseItem[] | undefined): QuestionnaireResponseItem[] | undefined => {
+            if (!items) {
+                return undefined;
+            }
+
+            const prunedItems = items.map((item) => {
+                const updatedItem = { ...item };
+                const nestedItems = pruneItems(updatedItem.item);
+
+                if (nestedItems && nestedItems.length > 0) {
+                    updatedItem.item = nestedItems;
+                } else {
+                    delete updatedItem.item;
+                }
+
+                return updatedItem;
+            });
+
+            return prunedItems;
+        };
+
+        const prunedRootItems = pruneItems(questionnaireResponse.item);
+
+        if (prunedRootItems && prunedRootItems.length > 0) {
+            questionnaireResponse.item = prunedRootItems;
+        } else {
+            delete questionnaireResponse.item;
+        }
+
         return questionnaireResponse;
     }
 
@@ -1004,20 +1150,43 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
         if (!answers || answers.length === 0) {
             if (type === "choice" && field.answerOption?.length) {
                 const initialSelected = field.answerOption.find((o) => o.initialSelected);
+
                 if (initialSelected?.valueCoding) {
-                    return `${initialSelected.valueCoding.system}|${initialSelected.valueCoding.code}`;
+                return `${initialSelected.valueCoding.system}|${initialSelected.valueCoding.code}`;
+                }
+
+                if (initialSelected?.valueReference) {
+                return initialSelected.valueReference.reference ?? "";
+                }
+
+                if (initialSelected?.valueString) {
+                return initialSelected.valueString;
                 }
             }
+
             return field.initialValue ?? "";
         }
 
         switch (type) {
             case "choice":
             case "coding":
-                return answers[0].valueCoding
-                    ? `${answers[0].valueCoding.system}|${answers[0].valueCoding.code}`
-                    : "";
+                {
+                    const answer = answers[0];
 
+                    if (answer.valueCoding) {
+                        return `${answer.valueCoding.system}|${answer.valueCoding.code}`;
+                    }
+
+                    if (answer.valueReference) {
+                        return answer.valueReference.reference ?? "";
+                    }
+
+                    if (answer.valueString) {
+                        return answer.valueString;
+                    }
+
+                    return "";
+                }
             case "quantity":
                 return answers[0].valueQuantity
                     ? `${answers[0].valueQuantity.value}|${answers[0].valueQuantity.unit}`
@@ -1068,16 +1237,20 @@ const QuestionnaireDisplay: React.FC<QuestionnaireDisplayProps> = (configs) => {
             />
             <Form noValidate validated={validated} onSubmit={handleSubmit} className='d-flex flex-column gap-4'>
                 <Form.Group>
-                    {fields.map(field => FieldRenderer.getFieldComponent(field, form, (form) => {
-                        var newForm = massageFormForDisabledFields(fields, form);
-                        //Transform form -> QR
-                        var currentQuestionnaireResponse = getQRFromForm(form);
-                        var variables: Map<string, any> = new Map<string,any>();
-                        evaluateVariables(fields, currentQuestionnaireResponse, variables);
-                        calculateValue(fields, currentQuestionnaireResponse, newForm, variables);
+                    {fields.map(field => (
+                        <React.Fragment key={field.id}>
+                            {FieldRenderer.getFieldComponent(field, form, (updatedForm) => {
+                                var newForm = massageFormForDisabledFields(fields, updatedForm);
+                                //Transform form -> QR
+                                var currentQuestionnaireResponse = getQRFromForm(updatedForm);
+                                var variables: Map<string, any> = new Map<string,any>();
+                                evaluateVariables(fields, currentQuestionnaireResponse, variables);
+                                calculateValue(fields, currentQuestionnaireResponse, newForm, variables);
 
-                        setForm(newForm);
-                    }, configs.valueSetLoader))}
+                                setForm(newForm);
+                            }, configs.valueSetLoader)}
+                        </React.Fragment>
+                    ))}
                 </Form.Group>
                 {!configs.readOnly &&
                     <Form.Group className="d-flex flex-wrap align-items-start gap-4">
