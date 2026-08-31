@@ -1,6 +1,6 @@
 {
   "name": "@fyrstain/hl7-front-library",
-  "version": "0.0.27-FINAL",
+  "version": "0.0.28-SNAPSHOT",
   "description": "Library of React components that can be used in front-end applications",
   "proxy": "http://localhost:3000",
   "scripts": {
@@ -25,7 +25,6 @@
     "@storybook/addon-interactions": "^7.6.3",
     "@storybook/addon-links": "^7.6.3",
     "@storybook/blocks": "^7.6.3",
-    "@storybook/preset-typescript": "^2.1.0",
     "@storybook/react": "^7.6.3",
     "@storybook/react-webpack5": "^7.6.3",
     "@storybook/test": "^7.6.3",
