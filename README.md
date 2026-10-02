@@ -12,7 +12,7 @@
 
   1) In the package.json file, increment the library version
   2) Run `npm run build` to build the project when you add a component
-  3) Run `npm publish ??` to publish the library (Scope TBD)
+  3) Merge the change into `feature` to publish a snapshot through GitHub Actions. See the release process below for stable versions.
 
 ## StoryBook
 
@@ -21,6 +21,14 @@
 ## Version management
 
 TBD
+
+## GitHub Actions releases
+
+The workflows in `.github/workflows` run directly in this repository. Pull requests run tests and a build. Every push to `feature` publishes a unique snapshot to Nexus, using the version from `package.json` plus the Actions run number and attempt (for example, `0.0.29-SNAPSHOT.123.1`). The checked-in version stays `X.Y.Z-SNAPSHOT`.
+
+To release, run **Prepare release** from the `feature` branch with `release_version` (for example, `0.0.29`) and `next_version` (for example, `0.0.30-SNAPSHOT`). It opens a `release/X.Y.Z` pull request to `master`. Merging that pull request publishes the stable npm package to Nexus with the `latest` distribution tag, creates a Git tag and GitHub Release, and opens a pull request to put the next snapshot version on `feature`.
+
+Add a repository Actions secret named `NPMRC` containing the complete npm configuration for Nexus, including the `@fyrstain:registry` URL and its authentication. The workflows require this secret only for publication; pull request CI can run without it, including pull requests from forks. In repository Actions settings, allow GitHub Actions to create pull requests and grant the workflow its requested `contents: write` and `pull-requests: write` permissions. The release workflow must exist on `master` before the first release pull request is merged.
 
 ## CSS variable used in components and editable in the application's css style
 
@@ -41,3 +49,27 @@ Most of the style used by the library is taken from Bootstrap. Other variables a
   --title-4-tablet-size: 1.19rem;
   --title-5-desktop-size: 1.25rem;
   --title-5-tablet-size: 1rem;
+
+
+## Request authorization
+
+An application can install the shared request authorization before rendering:
+
+```ts
+import axios from "axios";
+import { installRequestAuthorization } from "@fyrstain/hl7-front-library";
+import UserService from "./services/UserService";
+
+installRequestAuthorization({
+  getAccessToken: async () => {
+    const keycloak = UserService.getKC();
+    if (!keycloak.token) return undefined;
+    await keycloak.updateToken(30);
+    return keycloak.token;
+  },
+  serviceBaseUrls: [process.env.REACT_APP_FHIR_URL ?? "fhir"],
+  axios,
+});
+```
+
+The helper covers global `fetch`, `fhir-kit-client` calls from either library, and the supplied Axios instance. It authorizes same-origin requests and configured service URLs, preserves an existing Authorization header, and leaves other origins untouched. Pass each additional trusted API base URL in `serviceBaseUrls`. If Keycloak shares the app origin, use `excludeBaseUrls` for its realm path. The application remains responsible for refreshing its Keycloak token.
