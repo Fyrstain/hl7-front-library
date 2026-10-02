@@ -15,8 +15,6 @@ jobs:
   snapshot:
     name: Test, build and publish snapshot
     runs-on: ubuntu-latest
-    env:
-      NPMRC: ${{ secrets.NPMRC }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,18 +25,7 @@ jobs:
           node-version: '24'
           cache: npm
 
-      - name: Configure Nexus npm authentication
-        run: |
-          if [[ -z "$NPMRC" ]]; then
-            echo "Repository secret NPMRC is required." >&2
-            exit 1
-          fi
-          NPMRC_PATH="$RUNNER_TEMP/.npmrc"
-          printf '%s\n' "$NPMRC" > "$NPMRC_PATH"
-          chmod 600 "$NPMRC_PATH"
-          printf 'NPM_CONFIG_USERCONFIG=%s\n' "$NPMRC_PATH" >> "$GITHUB_ENV"
-
-      - name: Validate package and Nexus registry
+      - name: Validate package
         id: package
         run: |
           PACKAGE_NAME="$(node -p "require('./package.json').name")"
@@ -52,13 +39,7 @@ jobs:
             echo "Expected X.Y.Z-SNAPSHOT on feature; got $BASE_VERSION." >&2
             exit 1
           fi
-          REGISTRY_URL="$(npm config get @fyrstain:registry)"
-          if [[ ! "$REGISTRY_URL" =~ ^https?:// || "$REGISTRY_URL" == *registry.npmjs.org* ]]; then
-            echo "NPMRC must configure @fyrstain:registry to the Nexus npm registry." >&2
-            exit 1
-          fi
           printf 'base_version=%s\n' "$BASE_VERSION" >> "$GITHUB_OUTPUT"
-          printf 'registry=%s\n' "$REGISTRY_URL" >> "$GITHUB_OUTPUT"
 
       - name: Install dependencies
         run: npm ci
@@ -80,7 +61,35 @@ jobs:
       - name: Check package contents
         run: npm pack --dry-run
 
+      - name: Configure Nexus npm authentication
+        id: registry
+        env:
+          NPMRC: ${{ secrets.NPMRC }}
+          NEXUS_USERNAME: ${{ secrets.NEXUS_USERNAME }}
+          NEXUS_PASSWORD: ${{ secrets.NEXUS_PASSWORD }}
+        run: |
+          if [[ -z "$NPMRC" || -z "$NEXUS_USERNAME" || -z "$NEXUS_PASSWORD" ]]; then
+            echo "NPMRC, NEXUS_USERNAME and NEXUS_PASSWORD repository secrets are required." >&2
+            exit 1
+          fi
+
+          NPMRC_PATH="$RUNNER_TEMP/.npmrc"
+          printf '%s\n' "$NPMRC" > "$NPMRC_PATH"
+          chmod 600 "$NPMRC_PATH"
+          export NPM_CONFIG_USERCONFIG="$NPMRC_PATH"
+          REGISTRY_URL="$(npm config get @fyrstain:registry)"
+          if [[ ! "$REGISTRY_URL" =~ ^https?:// || "$REGISTRY_URL" == *registry.npmjs.org* ]]; then
+            echo "NPMRC must configure @fyrstain:registry to the Nexus npm registry." >&2
+            exit 1
+          fi
+
+          AUTH_KEY="$(node -e 'const u = new URL(process.argv[1]); console.log(`//${u.host}${u.pathname.replace(/\/*$/, "/")}:_auth`)' "$REGISTRY_URL")"
+          BASIC_AUTH="$(printf '%s:%s' "$NEXUS_USERNAME" "$NEXUS_PASSWORD" | base64 -w 0)"
+          printf '@fyrstain:registry=%s\n%s=%s\n' "$REGISTRY_URL" "$AUTH_KEY" "$BASIC_AUTH" > "$NPMRC_PATH"
+          printf 'NPM_CONFIG_USERCONFIG=%s\n' "$NPMRC_PATH" >> "$GITHUB_ENV"
+          printf 'url=%s\n' "$REGISTRY_URL" >> "$GITHUB_OUTPUT"
+
       - name: Publish snapshot to Nexus
         env:
-          REGISTRY_URL: ${{ steps.package.outputs.registry }}
+          REGISTRY_URL: ${{ steps.registry.outputs.url }}
         run: npm publish --tag snapshot --registry "$REGISTRY_URL"
