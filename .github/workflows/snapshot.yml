@@ -1,0 +1,86 @@
+name: Publish snapshot
+
+on:
+  push:
+    branches: [feature]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: npm-snapshot-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  snapshot:
+    name: Test, build and publish snapshot
+    runs-on: ubuntu-latest
+    env:
+      NPMRC: ${{ secrets.NPMRC }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Configure Nexus npm authentication
+        run: |
+          if [[ -z "$NPMRC" ]]; then
+            echo "Repository secret NPMRC is required." >&2
+            exit 1
+          fi
+          NPMRC_PATH="$RUNNER_TEMP/.npmrc"
+          printf '%s\n' "$NPMRC" > "$NPMRC_PATH"
+          chmod 600 "$NPMRC_PATH"
+          printf 'NPM_CONFIG_USERCONFIG=%s\n' "$NPMRC_PATH" >> "$GITHUB_ENV"
+
+      - name: Validate package and Nexus registry
+        id: package
+        run: |
+          PACKAGE_NAME="$(node -p "require('./package.json').name")"
+          BASE_VERSION="$(node -p "require('./package.json').version")"
+          PRIVATE="$(node -p "String(require('./package.json').private === true)")"
+          if [[ "$PACKAGE_NAME" != @fyrstain/* || "$PRIVATE" == true ]]; then
+            echo "Expected a publishable @fyrstain package." >&2
+            exit 1
+          fi
+          if [[ ! "$BASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-SNAPSHOT$ ]]; then
+            echo "Expected X.Y.Z-SNAPSHOT on feature; got $BASE_VERSION." >&2
+            exit 1
+          fi
+          REGISTRY_URL="$(npm config get @fyrstain:registry)"
+          if [[ ! "$REGISTRY_URL" =~ ^https?:// || "$REGISTRY_URL" == *registry.npmjs.org* ]]; then
+            echo "NPMRC must configure @fyrstain:registry to the Nexus npm registry." >&2
+            exit 1
+          fi
+          printf 'base_version=%s\n' "$BASE_VERSION" >> "$GITHUB_OUTPUT"
+          printf 'registry=%s\n' "$REGISTRY_URL" >> "$GITHUB_OUTPUT"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint --if-present
+
+      - name: Tests
+        run: npm test -- --runInBand
+
+      - name: Set unique snapshot version
+        env:
+          BASE_VERSION: ${{ steps.package.outputs.base_version }}
+        run: npm version "$BASE_VERSION.$GITHUB_RUN_NUMBER.$GITHUB_RUN_ATTEMPT" --no-git-tag-version --ignore-scripts
+
+      - name: Build
+        run: npm run build
+
+      - name: Check package contents
+        run: npm pack --dry-run
+
+      - name: Publish snapshot to Nexus
+        env:
+          REGISTRY_URL: ${{ steps.package.outputs.registry }}
+        run: npm publish --tag snapshot --registry "$REGISTRY_URL"
