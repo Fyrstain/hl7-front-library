@@ -1,4 +1,4 @@
-# fhir-front-library
+# hl7-front-library
 
   Note: Please ensure you have installed <code><a href="https://nodejs.org/en/download/">node js</a></code>
 
@@ -24,9 +24,9 @@ TBD
 
 ## GitHub Actions releases
 
-The workflows in `.github/workflows` run directly in this repository. Pull requests run tests and a build. Every push to `feature` publishes a unique snapshot to Nexus, using the version from `package.json` plus the Actions run number and attempt (for example, `0.0.29-SNAPSHOT.123.1`). The checked-in version stays `X.Y.Z-SNAPSHOT`.
+The workflows in `.github/workflows` run directly in this repository without calling the separate `github-workflows` repository. Pull requests run lint (when configured), deterministic tests, and a build. Every push to `feature` publishes a unique snapshot to Nexus, using the version from `package.json` plus the Actions run number and attempt (for example, `1.0.1-SNAPSHOT.123.1`). The checked-in version stays `X.Y.Z-SNAPSHOT`.
 
-To release, run **Prepare release** from the `feature` branch with `release_version` (for example, `0.0.29`) and `next_version` (for example, `0.0.30-SNAPSHOT`). It opens a `release/X.Y.Z` pull request to `master`. Merging that pull request publishes the stable npm package to Nexus with the `latest` distribution tag, creates a Git tag and GitHub Release, and opens a pull request to put the next snapshot version on `feature`.
+To release, run **Prepare release** from the `feature` branch with `release_version` (for example, `1.0.1`) and `next_version` (for example, `1.0.2-SNAPSHOT`). It opens a `release/X.Y.Z` pull request to `master`. Merging that pull request publishes the stable npm package to Nexus with the `latest` distribution tag, creates a Git tag and GitHub Release, and opens a pull request to put the next snapshot version on `feature`.
 
 Add repository Actions secrets `NPMRC`, `NEXUS_USERNAME`, and `NEXUS_PASSWORD`. `NPMRC` must set `@fyrstain:registry` to the Nexus npm repository URL; the workflows generate a registry-scoped Basic authentication entry from the username and password immediately before publishing. `NEXUS_REGISTRY` is not used by these npm workflows. Pull request CI runs without publication secrets, including pull requests from forks. In repository Actions settings, allow GitHub Actions to create pull requests and grant the workflow its requested `contents: write` and `pull-requests: write` permissions. The release workflow must exist on `master` before the first release pull request is merged.
 
