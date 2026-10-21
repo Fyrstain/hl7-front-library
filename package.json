@@ -1,13 +1,15 @@
 {
   "name": "@fyrstain/hl7-front-library",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Library of React components that can be used in front-end applications",
   "proxy": "http://localhost:3000",
   "scripts": {
-    "build": "rollup --bundleConfigAsCjs -c",
+    "build": "npm run typecheck && rollup --bundleConfigAsCjs -c",
+    "typecheck": "tsc --noEmit",
     "test": "jest --verbose",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "test:ci": "jest --ci --runInBand"
   },
   "author": "",
   "license": "ISC",
